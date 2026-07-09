@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Space Shooter</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+    canvas { background: #fff; display: block; }
+  </style>
+</head>
+<body>
+<canvas id="game"></canvas>
+<script>
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+
+canvas.width = Math.min(window.innerWidth, window.innerHeight * 0.75);
+canvas.height = Math.min(window.innerHeight, window.innerWidth / 0.75);
+
+const W = canvas.width;
+const H = canvas.height;
+
+const ship = {
+  x: W / 2,
+  y: H / 2,
+  angle: -Math.PI / 2,
+  speed: 0,
+  vx: 0,
+  vy: 0,
+  rotSpeed: 0.05,
+  accel: 0.2,
+  maxSpeed: 5,
+  friction: 0.97,
+  size: 18,
+};
+
+const bullets = [];
+let lastShot = 0;
+const SHOOT_DELAY = 300;
+
+const keys = {};
+
+// Keyboard
+window.addEventListener('keydown', e => keys[e.code] = true);
+window.addEventListener('keyup', e => keys[e.code] = false);
+
+function getGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const p of pads) if (p) return p;
+  return null;
+}
+
+function isPressed(button) {
+  return button && (button.pressed || button.value > 0.5);
+}
+
+function update(now) {
+  const gp = getGamepad();
+
+  // Rotation
+  let rotating = 0;
+  if (keys['ArrowLeft'] || keys['KeyA']) rotating = -1;
+  if (keys['ArrowRight'] || keys['KeyD']) rotating = 1;
+  if (gp) {
+    const lx = gp.axes[0];
+    if (Math.abs(lx) > 0.15) rotating = lx;
+  }
+  ship.angle += rotating * ship.rotSpeed;
+
+  // Thrust
+  let thrusting = false;
+  if (keys['ArrowUp'] || keys['KeyW']) thrusting = true;
+  if (gp && (isPressed(gp.buttons[12]) || gp.axes[1] < -0.15)) thrusting = true;
+
+  if (thrusting) {
+    ship.vx += Math.cos(ship.angle) * ship.accel;
+    ship.vy += Math.sin(ship.angle) * ship.accel;
+    const spd = Math.hypot(ship.vx, ship.vy);
+    if (spd > ship.maxSpeed) {
+      ship.vx = (ship.vx / spd) * ship.maxSpeed;
+      ship.vy = (ship.vy / spd) * ship.maxSpeed;
+    }
+  }
+
+  ship.vx *= ship.friction;
+  ship.vy *= ship.friction;
+  ship.x = (ship.x + ship.vx + W) % W;
+  ship.y = (ship.y + ship.vy + H) % H;
+
+  // Shoot
+  let shooting = keys['Space'] || keys['KeyZ'];
+  if (gp && (isPressed(gp.buttons[0]) || isPressed(gp.buttons[7]))) shooting = true;
+
+  if (shooting && now - lastShot > SHOOT_DELAY) {
+    lastShot = now;
+    bullets.push({
+      x: ship.x + Math.cos(ship.angle) * ship.size,
+      y: ship.y + Math.sin(ship.angle) * ship.size,
+      vx: Math.cos(ship.angle) * 10,
+      vy: Math.sin(ship.angle) * 10,
+      life: 60,
+    });
+  }
+
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.x = (b.x + b.vx + W) % W;
+    b.y = (b.y + b.vy + H) % H;
+    b.life--;
+    if (b.life <= 0) bullets.splice(i, 1);
+  }
+}
+
+function drawShip(x, y, angle, size) {
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.beginPath();
+  ctx.moveTo(size, 0);
+  ctx.lineTo(-size * 0.6, -size * 0.5);
+  ctx.lineTo(-size * 0.3, 0);
+  ctx.lineTo(-size * 0.6, size * 0.5);
+  ctx.closePath();
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Draw ship (wrap-around ghost copies)
+  for (const [dx, dy] of [[0,0],[-W,0],[W,0],[0,-H],[0,H]]) {
+    drawShip(ship.x + dx, ship.y + dy, ship.angle, ship.size);
+  }
+
+  // Bullets
+  ctx.fillStyle = '#000';
+  for (const b of bullets) {
+    ctx.beginPath();
+    ctx.arc(b.x, b.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Controls hint
+  ctx.fillStyle = '#aaa';
+  ctx.font = '14px monospace';
+  ctx.fillText('Arrows/WASD: move  |  Space/Z: shoot  |  Gamepad supported', 10, H - 12);
+}
+
+function loop(now) {
+  update(now);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
