@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Dev Panel</title>
+  <style>
+    body { font-family: monospace; padding: 30px; max-width: 500px; background: #1a1a1a; color: #eee; }
+    h1 { color: #f84; margin-bottom: 24px; }
+    .group { margin-bottom: 20px; }
+    label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 14px; }
+    input[type=range] { width: 260px; }
+    .val { width: 50px; text-align: right; color: #f84; }
+    button { margin-top: 20px; padding: 10px 24px; background: #f84; border: none; color: #000; font-family: monospace; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 4px; }
+    button:hover { background: #fa6; }
+    #status { margin-top: 12px; font-size: 12px; color: #888; }
+  </style>
+</head>
+<body>
+<h1>🎮 Dev Panel</h1>
+
+<div class="group">
+  <label>Lava speed <span class="val" id="lavaSpeed-val"></span></label>
+  <input type="range" id="lavaSpeed" min="0.05" max="10" step="0.05">
+</div>
+<div class="group">
+  <label>Lava size <span class="val" id="lavaSize-val"></span></label>
+  <input type="range" id="lavaSize" min="1" max="80" step="1">
+</div>
+<div class="group">
+  <label>Lava spawn rate (frames) <span class="val" id="lavaSpawnRate-val"></span></label>
+  <input type="range" id="lavaSpawnRate" min="5" max="500" step="5">
+</div>
+<div class="group">
+  <label>Number of hoses <span class="val" id="hoseCount-val"></span></label>
+  <input type="range" id="hoseCount" min="1" max="10" step="1">
+</div>
+<div class="group">
+  <label>Ship size <span class="val" id="shipSize-val"></span></label>
+  <input type="range" id="shipSize" min="5" max="100" step="1">
+</div>
+<div class="group">
+  <label>Restart delay (seconds) <span class="val" id="restartDelay-val"></span></label>
+  <input type="range" id="restartDelay" min="0" max="30" step="0.5">
+</div>
+
+<button onclick="push()">Push to game</button>
+<div id="status">Loading config...</div>
+
+<script>
+const fields = ['lavaSpeed','lavaSize','lavaSpawnRate','hoseCount','shipSize','restartDelay'];
+
+async function load() {
+  const res = await fetch('/config');
+  const cfg = await res.json();
+  for (const f of fields) {
+    document.getElementById(f).value = cfg[f];
+    document.getElementById(f + '-val').textContent = cfg[f];
+  }
+  document.getElementById('status').textContent = 'Loaded from server.';
+}
+
+for (const f of fields) {
+  document.getElementById(f).addEventListener('input', () => {
+    document.getElementById(f + '-val').textContent = document.getElementById(f).value;
+  });
+}
+
+async function push() {
+  const body = {};
+  for (const f of fields) body[f] = parseFloat(document.getElementById(f).value);
+  await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
+  document.getElementById('status').textContent = 'Pushed at ' + new Date().toLocaleTimeString();
+}
+
+load();
+</script>
+</body>
+</html>

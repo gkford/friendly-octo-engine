@@ -22,24 +22,51 @@ canvas.height = Math.min(800, window.innerHeight);
 const W = canvas.width;
 const H = canvas.height;
 
+// ─── Live config (polled from server) ────────────
+const cfg = {
+  lavaSpeed: 0.5,
+  lavaGravity: 0.03,
+  lavaSpawnRate: 80,
+  lavaSize: 10,
+  shipSpeed: 4,
+  bulletSpeed: 8,
+  shootDelay: 200,
+  shipSize: 24,
+  hoseCount: 2,
+  restartDelay: 2,
+};
+async function pollConfig() {
+  try {
+    const res = await fetch('/config');
+    Object.assign(cfg, await res.json());
+  } catch(e) {}
+}
+pollConfig();
+setInterval(pollConfig, 1000);
+
 // ─── Ship ────────────────────────────────────────
 const ship = {
   x: W / 2,
   y: H - 60,
-  w: 24,
-  h: 32,
-  speed: 4,
+  get w() { return cfg.shipSize; },
+  get h() { return cfg.shipSize * 1.33; },
+  get speed() { return cfg.shipSpeed; },
 };
 
-// ─── Hoses (two pipes at top) ────────────────────
-const hoseLeftX = W * 0.3;
-const hoseRightX = W * 0.7;
+// ─── Hoses ───────────────────────────────────────
 const hoseY = 0;
 const hoseLen = 60;
+function getHosePositions() {
+  const n = Math.max(1, Math.round(cfg.hoseCount));
+  const positions = [];
+  for (let i = 0; i < n; i++) positions.push(W * (i + 1) / (n + 1));
+  return positions;
+}
 
 // ─── Lava ────────────────────────────────────────
 const lavaParticles = [];
 let gameOver = false;
+let gameOverTime = 0;
 let frame = 0;
 
 // ─── Bullets ─────────────────────────────────────
@@ -57,21 +84,31 @@ window.addEventListener('keyup', e => keys[e.code] = false);
 
 // ─── Spawn lava ──────────────────────────────────
 function spawnLava() {
-  for (const hx of [hoseLeftX, hoseRightX]) {
+  for (const hx of getHosePositions()) {
     lavaParticles.push({
       x: hx + (Math.random() - 0.5) * 6,
       y: hoseY + hoseLen,
       vx: (Math.random() - 0.5) * 1.2,
-      vy: 1.2 + Math.random() * 0.8,
-      r: 10 + Math.random() * 8,
+      vy: cfg.lavaSpeed * (0.8 + Math.random() * 0.4),
+      r: cfg.lavaSize + Math.random() * 8,
       phase: Math.random() * Math.PI * 2,
     });
   }
 }
 
+// ─── Gamepad helpers ─────────────────────────────
+function getGamepad() {
+  const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+  for (const p of pads) if (p) return p;
+  return null;
+}
+function btnPressed(btn) { return btn && (btn.pressed || btn.value > 0.5); }
+
 // ─── Update ──────────────────────────────────────
 function update() {
   frame++;
+
+  const gp = getGamepad();
 
   // Ship movement (always points up)
   let dx = 0, dy = 0;
@@ -80,11 +117,19 @@ function update() {
   if (keys['ArrowUp'] || keys['KeyW']) dy = -1;
   if (keys['ArrowDown'] || keys['KeyS']) dy = 1;
 
-  // Normalise diagonal
-  if (dx !== 0 && dy !== 0) {
-    dx *= 0.707;
-    dy *= 0.707;
+  if (gp) {
+    const lx = gp.axes[0], ly = gp.axes[1];
+    if (Math.abs(lx) > 0.15) dx = lx;
+    if (Math.abs(ly) > 0.15) dy = ly;
+    if (btnPressed(gp.buttons[12])) dy = -1;
+    if (btnPressed(gp.buttons[13])) dy = 1;
+    if (btnPressed(gp.buttons[14])) dx = -1;
+    if (btnPressed(gp.buttons[15])) dx = 1;
   }
+
+  // Normalise diagonal
+  const mag = Math.hypot(dx, dy);
+  if (mag > 1) { dx /= mag; dy /= mag; }
 
   ship.x += dx * ship.speed;
   ship.y += dy * ship.speed;
@@ -92,13 +137,15 @@ function update() {
   ship.y = Math.max(ship.h / 2, Math.min(H - ship.h / 2, ship.y));
 
   // Shooting
-  if ((keys['Space'] || keys['KeyZ']) && !gameOver) {
-    if (Date.now() - lastShot > SHOOT_DELAY) {
+  const shooting = (keys['Space'] || keys['KeyZ']) ||
+    (gp && (btnPressed(gp.buttons[0]) || btnPressed(gp.buttons[7])));
+  if (shooting && !gameOver) {
+    if (Date.now() - lastShot > cfg.shootDelay) {
       lastShot = Date.now();
       bullets.push({
         x: ship.x,
         y: ship.y - ship.h / 2,
-        vy: -8,
+        vy: -cfg.bulletSpeed,
       });
     }
   }
@@ -125,7 +172,7 @@ function update() {
     const l = lavaParticles[i];
     l.x += l.vx;
     l.y += l.vy;
-    l.vy += 0.08; // gravity
+    l.vy += cfg.lavaGravity;
     l.phase += 0.1;
 
     // Remove if off screen
@@ -138,12 +185,13 @@ function update() {
       const d = Math.hypot(l.x - ship.x, l.y - ship.y);
       if (d < l.r + ship.w / 2.5) {
         gameOver = true;
+        gameOverTime = Date.now();
       }
     }
   }
 
   // Spawn new lava occasionally
-  if (!gameOver && frame % 80 === 0) spawnLava();
+  if (!gameOver && frame % cfg.lavaSpawnRate === 0) spawnLava();
 }
 
 // ─── Draw ship (always pointing up) ──────────────
@@ -177,7 +225,7 @@ function drawShip() {
 function drawHoses() {
   ctx.strokeStyle = '#888';
   ctx.lineWidth = 3;
-  for (const hx of [hoseLeftX, hoseRightX]) {
+  for (const hx of getHosePositions()) {
     ctx.beginPath();
     ctx.moveTo(hx, hoseY);
     ctx.lineTo(hx, hoseY + hoseLen);
@@ -216,6 +264,10 @@ function drawLava() {
 
 // ─── Draw game over ──────────────────────────────
 function drawGameOver() {
+  const elapsed = (Date.now() - gameOverTime) / 1000;
+  const remaining = Math.ceil(cfg.restartDelay - elapsed);
+  const canRestart = elapsed >= cfg.restartDelay;
+
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(0, 0, W, H);
 
@@ -226,7 +278,11 @@ function drawGameOver() {
 
   ctx.fillStyle = '#555';
   ctx.font = '20px monospace';
-  ctx.fillText('Press R to restart', W / 2, H / 2 + 30);
+  if (canRestart) {
+    ctx.fillText('Press any button to restart', W / 2, H / 2 + 30);
+  } else {
+    ctx.fillText(`Wait ${remaining}...`, W / 2, H / 2 + 30);
+  }
 }
 
 // ─── Draw bullets ────────────────────────────────
@@ -242,7 +298,7 @@ function drawUI() {
   ctx.fillStyle = '#555';
   ctx.font = '12px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('Arrows/WASD move  |  Space/Z shoot', 10, H - 10);
+  ctx.fillText('Arrows/WASD move  |  Space/Z shoot  |  Gamepad supported', 10, H - 10);
 }
 
 // ─── Main loop ───────────────────────────────────
@@ -265,15 +321,24 @@ function loop() {
 }
 
 // ─── Restart ─────────────────────────────────────
-window.addEventListener('keydown', function restart(e) {
-  if (e.code === 'KeyR' && gameOver) {
-    gameOver = false;
-    lavaParticles.length = 0;
-    bullets.length = 0;
-    ship.x = W / 2;
-    ship.y = H - 60;
-  }
-});
+function doRestart() {
+  gameOver = false;
+  lavaParticles.length = 0;
+  bullets.length = 0;
+  ship.x = W / 2;
+  ship.y = H - 60;
+}
+function canRestart() { return gameOver && (Date.now() - gameOverTime) / 1000 >= cfg.restartDelay; }
+
+window.addEventListener('keydown', e => { if (canRestart()) doRestart(); });
+
+let gpRestartHeld = false;
+setInterval(() => {
+  const gp = getGamepad();
+  const anyButton = gp && gp.buttons.some(b => btnPressed(b));
+  if (anyButton && !gpRestartHeld && canRestart()) doRestart();
+  gpRestartHeld = !!anyButton;
+}, 100);
 
 requestAnimationFrame(loop);
 </script>
