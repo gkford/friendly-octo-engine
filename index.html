@@ -2,11 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Lava Runner</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { background: #fff; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+    html, body { width: 100%; height: 100%; }
+    body {
+      background: #fff; display: flex; justify-content: center; align-items: center;
+      height: 100vh; height: 100dvh; overflow: hidden;
+    }
     canvas { background: #fff; display: block; }
   </style>
 </head>
@@ -16,11 +20,15 @@
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
-canvas.width = Math.min(600, window.innerWidth);
-canvas.height = Math.min(800, window.innerHeight);
-
-const W = canvas.width;
-const H = canvas.height;
+let W, H;
+function resizeCanvas() {
+  const vv = window.visualViewport;
+  W = canvas.width = Math.round(vv ? vv.width : window.innerWidth);
+  H = canvas.height = Math.round(vv ? vv.height : window.innerHeight);
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+window.addEventListener('orientationchange', resizeCanvas);
 
 // ─── Live config (polled from server) ────────────
 const cfg = {
@@ -33,7 +41,7 @@ const cfg = {
   shootDelay: 200,
   shipSize: 24,
   hoseCount: 2,
-  restartDelay: 2,
+  restartDelay: 3,
 };
 async function pollConfig() {
   try {
@@ -69,6 +77,13 @@ let gameOver = false;
 let gameOverTime = 0;
 let frame = 0;
 
+// ─── Screen state ────────────────────────────────
+let state = 'menu'; // 'menu' | 'playing'
+let menuIndex = 0;
+const games = [
+  { name: 'Lava Runner' },
+];
+
 // ─── Bullets ─────────────────────────────────────
 const bullets = [];
 let lastShot = 0;
@@ -103,6 +118,14 @@ function getGamepad() {
   return null;
 }
 function btnPressed(btn) { return btn && (btn.pressed || btn.value > 0.5); }
+
+const BTN_A = 0, BTN_B = 1, DPAD_LEFT = 14, DPAD_RIGHT = 15;
+let prevGpButtons = [];
+function gpEdge(index) {
+  const gp = getGamepad();
+  if (!gp) return false;
+  return btnPressed(gp.buttons[index]) && !prevGpButtons[index];
+}
 
 // ─── Update ──────────────────────────────────────
 function update() {
@@ -266,7 +289,7 @@ function drawLava() {
 function drawGameOver() {
   const elapsed = (Date.now() - gameOverTime) / 1000;
   const remaining = Math.ceil(cfg.restartDelay - elapsed);
-  const canRestart = elapsed >= cfg.restartDelay;
+  const restartReady = elapsed >= cfg.restartDelay;
 
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(0, 0, W, H);
@@ -278,11 +301,55 @@ function drawGameOver() {
 
   ctx.fillStyle = '#555';
   ctx.font = '20px monospace';
-  if (canRestart) {
-    ctx.fillText('Press any button to restart', W / 2, H / 2 + 30);
+  if (restartReady) {
+    ctx.fillText('A: Restart   B: Menu', W / 2, H / 2 + 30);
   } else {
-    ctx.fillText(`Wait ${remaining}...`, W / 2, H / 2 + 30);
+    ctx.fillText(`Restart in ${remaining}...   B: Menu`, W / 2, H / 2 + 30);
   }
+}
+
+// ─── Draw menu ───────────────────────────────────
+function drawMenu() {
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 32px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('SELECT GAME', W / 2, H / 3 - 60);
+
+  const boxW = 160, boxH = 120, gap = 20;
+  const total = games.length * boxW + (games.length - 1) * gap;
+  const startX = (W - total) / 2;
+  const y = H / 3;
+
+  games.forEach((g, i) => {
+    const x = startX + i * (boxW + gap);
+    const selected = i === menuIndex;
+    ctx.fillStyle = selected ? '#fde' : '#fff';
+    ctx.fillRect(x, y, boxW, boxH);
+    ctx.strokeStyle = selected ? '#f84' : '#000';
+    ctx.lineWidth = selected ? 4 : 2;
+    ctx.strokeRect(x, y, boxW, boxH);
+    ctx.fillStyle = '#000';
+    ctx.font = '16px monospace';
+    ctx.fillText(g.name, x + boxW / 2, y + boxH / 2 + 6);
+  });
+
+  ctx.fillStyle = '#555';
+  ctx.font = '14px monospace';
+  ctx.fillText('◄/► choose   A: play', W / 2, y + boxH + 50);
+}
+
+function moveMenu(delta) {
+  menuIndex = ((menuIndex + delta) % games.length + games.length) % games.length;
+}
+
+function launchGame(i) {
+  resetGame();
+  state = 'playing';
+}
+
+function backToMenu() {
+  resetGame();
+  state = 'menu';
 }
 
 // ─── Draw bullets ────────────────────────────────
@@ -296,15 +363,13 @@ function drawBullets() {
 // ─── Draw UI ─────────────────────────────────────
 function drawUI() {
   ctx.fillStyle = '#555';
-  ctx.font = '12px monospace';
+  ctx.font = '14px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('Arrows/WASD move  |  Space/Z shoot  |  Gamepad supported', 10, H - 10);
+  ctx.fillText('Arrows/WASD move  |  Space/Z shoot  |  Gamepad supported', 12, H - 20);
 }
 
 // ─── Main loop ───────────────────────────────────
 function draw() {
-  ctx.clearRect(0, 0, W, H);
-
   drawHoses();
   drawLava();
   drawBullets();
@@ -315,30 +380,59 @@ function draw() {
 }
 
 function loop() {
-  if (!gameOver) update();
-  draw();
+  ctx.clearRect(0, 0, W, H);
+  if (state === 'menu') {
+    drawMenu();
+  } else {
+    if (!gameOver) update();
+    draw();
+  }
+  handleGamepadInput();
   requestAnimationFrame(loop);
 }
 
 // ─── Restart ─────────────────────────────────────
-function doRestart() {
+function resetGame() {
   gameOver = false;
   lavaParticles.length = 0;
   bullets.length = 0;
   ship.x = W / 2;
   ship.y = H - 60;
 }
+function doRestart() { resetGame(); }
 function canRestart() { return gameOver && (Date.now() - gameOverTime) / 1000 >= cfg.restartDelay; }
 
-window.addEventListener('keydown', e => { if (canRestart()) doRestart(); });
+// ─── Keyboard: menu / game-over actions (one-shot) ─
+window.addEventListener('keydown', e => {
+  if (e.repeat) return;
+  const isA = e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyZ';
+  const isB = e.code === 'Escape' || e.code === 'Backspace' || e.code === 'KeyX';
 
-let gpRestartHeld = false;
-setInterval(() => {
+  if (state === 'menu') {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyA') moveMenu(-1);
+    if (e.code === 'ArrowRight' || e.code === 'KeyD') moveMenu(1);
+    if (isA) launchGame(menuIndex);
+  } else if (gameOver) {
+    if (isA && canRestart()) doRestart();
+    if (isB) backToMenu();
+  }
+});
+
+// ─── Gamepad: menu / game-over actions (edge-triggered) ─
+function handleGamepadInput() {
   const gp = getGamepad();
-  const anyButton = gp && gp.buttons.some(b => btnPressed(b));
-  if (anyButton && !gpRestartHeld && canRestart()) doRestart();
-  gpRestartHeld = !!anyButton;
-}, 100);
+  if (gp) {
+    if (state === 'menu') {
+      if (gpEdge(DPAD_LEFT)) moveMenu(-1);
+      if (gpEdge(DPAD_RIGHT)) moveMenu(1);
+      if (gpEdge(BTN_A)) launchGame(menuIndex);
+    } else if (gameOver) {
+      if (gpEdge(BTN_A) && canRestart()) doRestart();
+      if (gpEdge(BTN_B)) backToMenu();
+    }
+  }
+  prevGpButtons = gp ? gp.buttons.map(b => btnPressed(b)) : [];
+}
 
 requestAnimationFrame(loop);
 </script>

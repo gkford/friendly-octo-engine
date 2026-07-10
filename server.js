@@ -14,7 +14,7 @@ const config = {
   shootDelay: 200,
   shipSize: 24,
   hoseCount: 2,
-  restartDelay: 2,
+  restartDelay: 3,
 };
 
 app.get('/config', (req, res) => res.json(config));
