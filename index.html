@@ -9,13 +9,19 @@
     html, body { width: 100%; height: 100%; }
     body {
       background: #fff; display: flex; justify-content: center; align-items: center;
-      height: 100vh; height: 100dvh; overflow: hidden;
+      height: 100vh; height: 100dvh; overflow: hidden; position: relative;
     }
     canvas { background: #fff; display: block; }
+    #debug {
+      position: fixed; top: 0; left: 0; z-index: 999; pointer-events: none;
+      font: 11px monospace; color: #888; background: rgba(255,255,255,0.85);
+      padding: 4px 6px; max-height: 80px; overflow: hidden; white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="debug"></div>
 <script>
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -35,13 +41,23 @@ const cfg = {
   lavaSpeed: 0.5,
   lavaGravity: 0.03,
   lavaSpawnRate: 80,
-  lavaSize: 10,
+  lavaSizeMin: 10,
+  lavaSizeMax: 50,
+  lavaHarmPercent: 50,
   shipSpeed: 4,
   bulletSpeed: 8,
   shootDelay: 200,
   shipSize: 24,
   hoseCount: 2,
-  restartDelay: 3,
+  restartDelay: 5,
+  uiLayout: 'bottom',
+  musicTrack: 'lava_core',
+  musicTempo: 130,
+  musicVolume: 0.35,
+  musicOn: 1,
+  get lavaHarmSize() {
+    return cfg.lavaSizeMin + (cfg.lavaHarmPercent / 100) * (cfg.lavaSizeMax - cfg.lavaSizeMin);
+  },
 };
 async function pollConfig() {
   try {
@@ -64,6 +80,176 @@ const ship = {
 // ─── Hoses ───────────────────────────────────────
 const hoseY = 0;
 const hoseLen = 60;
+
+// ─── Pumper (concertina bellows) ─────────────────
+const PUMPER_SCALE = 0.5;
+const PUMPER_ANCHOR_Y = 20;
+const PUMPER_TEETH = 6;
+const PUMPER_HALFW = 62 * PUMPER_SCALE;
+const PUMPER_INNER = 18 * PUMPER_SCALE;
+const PUMPER_BASEGAP = 36 * PUMPER_SCALE;
+const PUMPER_EXTRAGAP = 28 * PUMPER_SCALE;
+const PUMPER_POINTINESS = 14 * PUMPER_SCALE;
+const PUMPER_HATCH = 24;
+
+let pumpers = []; // { ext, speed, phase, destroyed, settled } per hose
+
+function initPumpers() {
+  const n = Math.max(1, Math.round(cfg.hoseCount));
+  pumpers = [];
+  for (let i = 0; i < n; i++) {
+    pumpers.push({ ext: 0.5, speed: 2 + Math.random(), phase: Math.random() * Math.PI * 2, destroyed: false, settled: false });
+  }
+}
+
+function getPumperTipY(idx) {
+  const p = pumpers[idx];
+  if (!p) return PUMPER_ANCHOR_Y + 60;
+  const gap = PUMPER_BASEGAP + PUMPER_EXTRAGAP * p.ext;
+  return PUMPER_ANCHOR_Y + PUMPER_TEETH * gap + PUMPER_POINTINESS;
+}
+
+function updatePumpers() {
+  const t = Date.now() / 1000;
+  for (let i = 0; i < pumpers.length; i++) {
+    const p = pumpers[i];
+    if (p.settled) continue;
+    if (p.destroyed) {
+      p.ext *= 0.96;
+      p.speed *= 0.99;
+      if (p.ext < 0.01) { p.ext = 0; p.settled = true; }
+    } else {
+      p.ext = 0.5 + 0.5 * Math.sin(t * p.speed * 0.9 + p.phase);
+    }
+  }
+}
+
+function pumperJitter(seed, amp) {
+  const s = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
+  return (s - Math.floor(s) - 0.5) * 2 * amp;
+}
+
+function getPumperPoints(ax, ext) {
+  const gap = PUMPER_BASEGAP + PUMPER_EXTRAGAP * ext;
+  const pts = [];
+  const ay = PUMPER_ANCHOR_Y;
+  pts.push([ax - PUMPER_INNER, ay]);
+  let y = ay;
+  for (let i = 0; i < PUMPER_TEETH; i++) {
+    pts.push([ax - PUMPER_HALFW, y + gap * 0.5]);
+    pts.push([ax - PUMPER_INNER, y + gap]);
+    y += gap;
+  }
+  pts.pop();
+  const bottomY = y;
+  pts.push([ax, bottomY + PUMPER_POINTINESS]);
+  const R = [];
+  y = ay;
+  for (let i = 0; i < PUMPER_TEETH; i++) {
+    if (i > 0) R.push([ax + PUMPER_INNER, y + gap * 0.25]);
+    R.push([ax + PUMPER_HALFW, y + gap * 0.75]);
+    y += gap;
+  }
+  R.reverse();
+  for (const pt of R) pts.push(pt);
+  pts.push([ax + PUMPER_INNER, ay]);
+  pts.push([ax - PUMPER_INNER, ay]);
+  return pts;
+}
+
+function drawPumpers() {
+  const positions = getHosePositions();
+  for (let idx = 0; idx < positions.length; idx++) {
+    const cx = positions[idx];
+    const p = pumpers[idx];
+    if (!p) continue;
+    const ext = p.ext;
+    const gap = PUMPER_BASEGAP + PUMPER_EXTRAGAP * ext;
+    const seedBase = idx * 1000;
+    const jitAmp = p.settled ? 0 : p.destroyed ? Math.max(0.3, p.ext * 1.8) : 2.2;
+
+    const destroyed = destroyedHoses.has(idx);
+    const col = destroyed ? '#999' : '#111';
+    const pipeCol = destroyed ? '#bbb' : '#888';
+
+    // Pipe
+    ctx.strokeStyle = pipeCol;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx - PUMPER_INNER + pumperJitter(seedBase, jitAmp*0.4), 0);
+    ctx.lineTo(cx - PUMPER_INNER + pumperJitter(seedBase+1, jitAmp*0.4), PUMPER_ANCHOR_Y);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx + PUMPER_INNER + pumperJitter(seedBase+2, jitAmp*0.4), 0);
+    ctx.lineTo(cx + PUMPER_INNER + pumperJitter(seedBase+3, jitAmp*0.4), PUMPER_ANCHOR_Y);
+    ctx.stroke();
+
+    // Bellows outline
+    const pts = getPumperPoints(cx, ext);
+    ctx.strokeStyle = col;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      const x = pts[i][0] + pumperJitter(seedBase + i * 2, jitAmp);
+      const y = pts[i][1] + pumperJitter(seedBase + i * 2 + 1, jitAmp);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.stroke();
+
+    // Hatch lines — clipped to bellows outline
+    if (!p.settled) {
+      ctx.save();
+      // Build clip path from bellows outline
+      const clipPts = getPumperPoints(cx, ext);
+      ctx.beginPath();
+      for (let i = 0; i < clipPts.length; i++) {
+        const x = clipPts[i][0] + pumperJitter(seedBase + i * 2, jitAmp);
+        const y = clipPts[i][1] + pumperJitter(seedBase + i * 2 + 1, jitAmp);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      }
+      ctx.closePath();
+      ctx.clip();
+
+      const h0 = PUMPER_ANCHOR_Y + 4;
+      const hSpan = (PUMPER_TEETH * gap + PUMPER_POINTINESS) - 8;
+      ctx.strokeStyle = destroyed ? '#aaa' : '#111';
+      ctx.lineWidth = 1.2;
+      for (let i = 0; i < PUMPER_HATCH; i++) {
+        const yy = h0 + (i / PUMPER_HATCH) * hSpan;
+        const wob = pumperJitter(seedBase + i * 7 + 200, jitAmp * 3);
+        ctx.beginPath();
+        ctx.moveTo(cx - PUMPER_HALFW - 8 + wob, yy + 8);
+        ctx.lineTo(cx + PUMPER_HALFW + 8 + wob, yy - 8);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // Flash on destroy
+    if (destroyed) {
+      const justDestroyed = Date.now() - destroyedHoses.get(idx) < 1000;
+      if (justDestroyed) {
+        const flash = Math.sin(frame * 0.3) > 0;
+        ctx.strokeStyle = flash ? '#f84' : '#ddd';
+        ctx.lineWidth = 3;
+        const pts2 = getPumperPoints(cx, ext);
+        ctx.beginPath();
+        for (let i = 0; i < pts2.length; i++) {
+          const x = pts2[i][0] + pumperJitter(seedBase + i * 2, jitAmp);
+          const y = pts2[i][1] + pumperJitter(seedBase + i * 2 + 1, jitAmp);
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+  }
+}
+
 function getHosePositions() {
   const n = Math.max(1, Math.round(cfg.hoseCount));
   const positions = [];
@@ -89,6 +275,263 @@ const bullets = [];
 let lastShot = 0;
 const SHOOT_DELAY = 200;
 
+// ─── Power bar & splashes ────────────────────────
+let POWER_TARGET = 10;
+const CHARGE_MS = 4000;
+const NO_SPAWN_MS = 10000;
+const powerBar = {
+  bricks: 0,
+};
+let barState = 'normal'; // 'normal' | 'charged' | 'charging'
+let chargeStart = 0;
+let collectedValues = [];
+let barDisplay = 0; // eases toward powerBar.bricks each frame, for animated fill/drain
+let missDisplayValues = null; // last busted combo, shown briefly in red
+let missDisplayUntil = 0;
+let superShot = null;
+let noSpawnUntil = 0;
+let destroyedHoses = new Map(); // idx -> Date.now() when destroyed
+let won = false;
+let winDelayUntil = 0; // timestamp after which the actual win screen kicks in
+const splashes = [];
+
+// ─── Screen flash & banner messages ──────────────
+let flashColor = null, flashUntil = 0;
+let bannerText = null, bannerColor = '#fff', bannerUntil = 0;
+function triggerFlash(color, ms) { flashColor = color; flashUntil = Date.now() + ms; }
+function showBanner(text, color, ms) { bannerText = text; bannerColor = color; bannerUntil = Date.now() + ms; }
+
+// ─── Shared AudioContext (one for all sounds) ─────
+let sharedAudioCtx = null;
+function getAudioCtx() {
+  if (!sharedAudioCtx) sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const st = sharedAudioCtx.state;
+  if (st === 'suspended' || st === 'interrupted') sharedAudioCtx.resume();
+  return sharedAudioCtx;
+}
+
+// ─── Debug overlay ───────────────────────────────
+const debugEl = document.getElementById('debug');
+let debugMessages = [];
+function showDebug(msg) {
+  debugMessages.push(msg);
+  if (debugMessages.length > 6) debugMessages.shift();
+  debugEl.textContent = debugMessages.join('\n');
+}
+window.addEventListener('error', e => showDebug('ERR: ' + e.message));
+window.addEventListener('unhandledrejection', e => showDebug('REJ: ' + (e.reason||'')));
+window.addEventListener('gamepadconnected', e => showDebug('PAD: ' + e.gamepad.id + ' mapping=' + e.gamepad.mapping));
+// iOS gesture unlock: resume AudioContext on every gesture (persistent)
+function reportError(e) { showDebug('ERR: ' + (e && e.message || e)); }
+function unlockAudio() {
+  const c = sharedAudioCtx;
+  if (c) {
+    const st = c.state;
+    if (st === 'suspended' || st === 'interrupted') c.resume();
+  }
+}
+window.addEventListener('touchstart', unlockAudio);
+window.addEventListener('mousedown', unlockAudio);
+window.addEventListener('keydown', unlockAudio);
+
+// ─── Web Audio: charge sound ─────────────────────
+let chargeOsc = null, chargeGain = null;
+function startChargeSound() {
+  if (chargeOsc) return;
+  try {
+    const ac = getAudioCtx();
+    chargeGain = ac.createGain();
+    chargeGain.gain.setValueAtTime(0.08, ac.currentTime);
+    chargeGain.gain.linearRampToValueAtTime(0.15, ac.currentTime + 4);
+    chargeGain.connect(ac.destination);
+    chargeOsc = ac.createOscillator();
+    chargeOsc.type = 'sawtooth';
+    chargeOsc.frequency.setValueAtTime(150, ac.currentTime);
+    chargeOsc.frequency.linearRampToValueAtTime(900, ac.currentTime + 4);
+    chargeOsc.connect(chargeGain);
+    chargeOsc.start(ac.currentTime);
+    chargeOsc.stop(ac.currentTime + 4.5);
+    chargeOsc.onended = () => { chargeOsc = null; chargeGain = null; };
+  } catch(e) {}
+}
+function stopChargeSound() {
+  try { if (chargeOsc) { chargeOsc.stop(); chargeOsc = null; } } catch(e) {}
+}
+
+// ─── Web Audio: background music (Lava Core) ────
+let musicPlaying = false;
+let musicNodes = [];
+let musicTimer = null;
+let musicMuted = false;
+
+function stopGameMusic() {
+  musicPlaying = false;
+  if (musicTimer) { clearTimeout(musicTimer); musicTimer = null; }
+  for (const n of musicNodes) {
+    try { n.stop(); } catch(e) {}
+    try { n.disconnect(); } catch(e) {}
+  }
+  musicNodes = [];
+}
+
+function scheduleNote(ctx, time, dur, freq, type, vol, dest) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, time);
+  gain.gain.setValueAtTime(0, time);
+  gain.gain.linearRampToValueAtTime(vol, time + 0.005);
+  gain.gain.setValueAtTime(vol, time + dur * 0.7);
+  gain.gain.linearRampToValueAtTime(0, time + dur);
+  osc.connect(gain);
+  gain.connect(dest || ctx.destination);
+  osc.start(time);
+  osc.stop(time + dur + 0.02);
+  musicNodes.push(osc, gain);
+}
+
+function scheduleNoise(ctx, time, dur, vol, dest) {
+  const bufferSize = ctx.sampleRate * dur;
+  const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+  const src = ctx.createBufferSource();
+  src.buffer = buffer;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(vol, time);
+  gain.gain.linearRampToValueAtTime(0, time + dur);
+  const filter = ctx.createBiquadFilter();
+  filter.type = 'highpass';
+  filter.frequency.setValueAtTime(8000, time);
+  src.connect(gain);
+  gain.connect(filter);
+  filter.connect(dest || ctx.destination);
+  src.start(time);
+  src.stop(time + dur + 0.02);
+  musicNodes.push(src, gain, filter);
+}
+
+const PENTA_LOW = [130.8, 146.8, 164.8, 196.0, 220.0, 261.6];
+
+function scheduleLavaCoreChunk(ctx, startBeat, beats, beatDur, vol, dest) {
+  const start = ctx.currentTime + 0.05;
+  const bd = beatDur;
+  for (let bar = 0; bar < 8; bar++) {
+    const barTime = start + bar * 4 * bd;
+    const bassPats = [PENTA_LOW[0], PENTA_LOW[0], PENTA_LOW[2], PENTA_LOW[2],
+                      PENTA_LOW[3], PENTA_LOW[3], PENTA_LOW[4], PENTA_LOW[4]];
+    for (let i = 0; i < bassPats.length; i++) {
+      const t = barTime + i * bd * 0.5;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(bassPats[i] * 0.5, t);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol * 0.5, t + bd * 0.05);
+      g.gain.setValueAtTime(vol * 0.5, t + bd * 0.3);
+      g.gain.linearRampToValueAtTime(0, t + bd * 0.45);
+      osc.connect(g);
+      g.connect(dest);
+      osc.start(t);
+      osc.stop(t + bd * 0.5);
+      musicNodes.push(osc, g);
+    }
+    // Lead — sawtooth
+    const blues = [220, 233, 261.6, 277.2, 329.6, 349.2, 392, 440, 466, 523.3];
+    for (let i = 0; i < 4; i++) {
+      const t = barTime + i * bd;
+      const freq = blues[Math.floor(Math.random() * (blues.length - 2)) + 2];
+      const d = bd * (0.25 + Math.random() * 0.5);
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(freq, t);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol * 0.25, t + bd * 0.02);
+      g.gain.setValueAtTime(vol * 0.25, t + d * 0.7);
+      g.gain.linearRampToValueAtTime(0, t + d);
+      osc.connect(g);
+      g.connect(dest);
+      osc.start(t);
+      osc.stop(t + d + 0.02);
+      musicNodes.push(osc, g);
+    }
+    // Percussion
+    for (let i = 0; i < 4; i++) {
+      const t = barTime + i * bd;
+      if (i % 2 === 0) scheduleNoise(ctx, t, bd * 0.15, vol * 0.3, dest);
+      scheduleNoise(ctx, t + bd * 0.5, bd * 0.06, vol * 0.1, dest);
+    }
+  }
+}
+
+function startGameMusic() {
+  try {
+    if (musicMuted || musicPlaying) return;
+    stopGameMusic();
+    const ctx = getAudioCtx();
+    const vol = cfg.musicVolume || 0.35;
+    const tempo = cfg.musicTempo || 130;
+    musicPlaying = true;
+
+    function playChunk() {
+      if (!musicPlaying) return;
+      if (ctx.state !== 'running') {
+        musicTimer = setTimeout(playChunk, 500);
+        return;
+      }
+      const master = ctx.createGain();
+      master.gain.setValueAtTime(vol * 0.5, ctx.currentTime);
+      master.connect(ctx.destination);
+      musicNodes.push(master);
+
+      scheduleLavaCoreChunk(ctx, 0, 32, 60 / tempo, vol, master);
+
+      const chunkDur = 32 * (60 / tempo) * 1000;
+      musicTimer = setTimeout(() => {
+        if (musicPlaying) playChunk();
+      }, chunkDur - 300);
+    }
+
+    playChunk();
+  } catch (e) { reportError(e); }
+}
+
+// ─── Web Audio: target hit / miss sounds ─────────
+function playPositiveSound() {
+  try {
+    const ac = getAudioCtx();
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0.2, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.45);
+    gain.connect(ac.destination);
+    const osc = ac.createOscillator();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(523, ac.currentTime);
+    osc.frequency.setValueAtTime(659, ac.currentTime + 0.1);
+    osc.frequency.setValueAtTime(784, ac.currentTime + 0.2);
+    osc.connect(gain);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 0.5);
+  } catch(e) {}
+}
+function playNegativeSound() {
+  try {
+    const ac = getAudioCtx();
+    const gain = ac.createGain();
+    gain.gain.setValueAtTime(0.2, ac.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + 0.4);
+    gain.connect(ac.destination);
+    const osc = ac.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, ac.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(80, ac.currentTime + 0.4);
+    osc.connect(gain);
+    osc.start(ac.currentTime);
+    osc.stop(ac.currentTime + 0.45);
+  } catch(e) {}
+}
+
 // ─── Input ───────────────────────────────────────
 const keys = {};
 window.addEventListener('keydown', e => {
@@ -97,17 +540,158 @@ window.addEventListener('keydown', e => {
 });
 window.addEventListener('keyup', e => keys[e.code] = false);
 
+function randomPowerTarget() {
+  POWER_TARGET = 3 + Math.floor(Math.random() * 18); // 3..20
+}
+
+// ─── Random lava size helpers ────────────────────
+function gaussianRandom(mean, std) {
+  let u = 0, v = 0;
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
+  return mean + std * Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
+}
+
+// Pick a blob value (1..POWER_TARGET-1) from a flat-ish gaussian centred at target/2.
+// If a value is rolled that would overflow the remaining gap, reroll 75% of the time
+// to soften the frustration while keeping the risk alive.
+function pickBlobValue() {
+  if (POWER_TARGET <= 2) return 1;
+  const mean = POWER_TARGET / 2;
+  const std = mean * 0.7; // flat-ish shape: std = 70% of mean
+  let v = Math.round(gaussianRandom(mean, std));
+  v = Math.max(1, Math.min(POWER_TARGET - 1, v));
+
+  const collected = powerBar.bricks;
+  const remaining = POWER_TARGET - collected;
+  if (collected > 0 && v > remaining && Math.random() < 0.75) {
+    // Reroll once, biased toward the remaining range
+    let u = Math.round(gaussianRandom(remaining / 2, Math.min(remaining / 2, std)));
+    u = Math.max(1, Math.min(remaining, u));
+    return u;
+  }
+  return v;
+}
+
+// Map chosen value to a radius inside the safe (blue) zone.
+// Divides [lavaSizeMin, harmSize) into equal bands — one per possible value —
+// then picks a random radius inside the band for that value.
+function mapValueToRadius(value) {
+  const mn = cfg.lavaSizeMin;
+  const harm = cfg.lavaHarmSize;
+  const bands = POWER_TARGET - 1; // 1..POWER_TARGET-1
+  const bandSize = (harm - mn) / bands;
+  const bandStart = mn + (value - 1) * bandSize;
+  // 90% of the band to leave a gap between adjacent bands
+  return bandStart + Math.random() * bandSize * 0.9;
+}
+
+// Reverse-map a radius back to its blob value.
+function valueForSize(r) {
+  const mn = cfg.lavaSizeMin;
+  const harm = cfg.lavaHarmSize;
+  const bands = POWER_TARGET - 1;
+  const bandSize = (harm - mn) / bands;
+  const band = Math.floor((r - mn) / bandSize);
+  return Math.max(1, Math.min(bands, band + 1));
+}
+
 // ─── Spawn lava ──────────────────────────────────
 function spawnLava() {
-  for (const hx of getHosePositions()) {
+  const positions = getHosePositions();
+  for (let idx = 0; idx < positions.length; idx++) {
+    if (destroyedHoses.has(idx)) continue;
+    const hx = positions[idx];
+    let r, harmful;
+    // ~40% chance of a harmful red blob, rest are safe blue numbered blobs
+    const harmChance = 0.4;
+    if (Math.random() < harmChance) {
+      harmful = true;
+      r = cfg.lavaHarmSize + Math.random() * (cfg.lavaSizeMax - cfg.lavaHarmSize);
+    } else {
+      harmful = false;
+      r = mapValueToRadius(pickBlobValue());
+    }
+    const spawnY = pumpers[idx] ? getPumperTipY(idx) : PUMPER_ANCHOR_Y + 60;
     lavaParticles.push({
       x: hx + (Math.random() - 0.5) * 6,
-      y: hoseY + hoseLen,
+      y: spawnY,
       vx: (Math.random() - 0.5) * 1.2,
       vy: cfg.lavaSpeed * (0.8 + Math.random() * 0.4),
-      r: cfg.lavaSize + Math.random() * 8,
+      r: r,
+      harmful,
+      value: harmful ? 0 : valueForSize(r),
       phase: Math.random() * Math.PI * 2,
     });
+  }
+}
+
+// ─── Splash effect (blue — for collecting safe blobs) ─
+function createSplash(x, y) {
+  for (let i = 0; i < 12; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 1 + Math.random() * 3.5;
+    splashes.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      r: 2 + Math.random() * 4,
+      color: '#48f',
+      life: 1,
+      decay: 0.02 + Math.random() * 0.03,
+    });
+  }
+}
+
+// ─── Lava explosion (red/orange — for destroying harmful blobs) ─
+function createLavaExplosion(x, y) {
+  for (let i = 0; i < 18; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2 + Math.random() * 5;
+    splashes.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 1, // slight upward bias
+      r: 3 + Math.random() * 6,
+      color: Math.random() < 0.5 ? '#f60' : '#f20', // orange / deep orange
+      life: 1,
+      decay: 0.015 + Math.random() * 0.02,
+    });
+  }
+}
+
+// ─── Super shot zoom path ─────────────────────────
+function buildZoomPath(sx, sy, targetIdx, redWaypoints = []) {
+  const positions = getHosePositions();
+  const pts = [{ x: sx, y: sy }];
+  // Thread through each red blob position
+  for (const wp of redWaypoints) {
+    pts.push(wp);
+  }
+  // Add a couple of random bounce points for flair
+  for (let i = 0; i < 2; i++) {
+    pts.push({
+      x: 40 + Math.random() * (W - 80),
+      y: 60 + Math.random() * (H - 160),
+    });
+  }
+  // End at the target pump
+  pts.push({ x: positions[targetIdx], y: getPumperTipY(targetIdx) });
+  return pts;
+}
+function pointOnPath(pts, t) {
+  const segs = pts.length - 1;
+  const segT = t * segs;
+  const i = Math.min(Math.floor(segT), segs - 1);
+  const localT = segT - i;
+  const eased = localT * localT * (3 - 2 * localT);
+  const a = pts[i], b = pts[i + 1];
+  return { x: a.x + (b.x - a.x) * eased, y: a.y + (b.y - a.y) * eased };
+}
+function checkWinCondition() {
+  if (destroyedHoses.size >= getHosePositions().length && !gameOver) {
+    won = true;
+    winDelayUntil = Date.now() + 2500; // 2.5 s to watch the last pump stop
   }
 }
 
@@ -130,6 +714,13 @@ function gpEdge(index) {
 // ─── Update ──────────────────────────────────────
 function update() {
   frame++;
+
+  // Win delay — once the last pump is destroyed, wait a beat then show the screen
+  if (won && !gameOver && Date.now() >= winDelayUntil) {
+    gameOver = true;
+    gameOverTime = Date.now();
+    stopGameMusic();
+  }
 
   const gp = getGamepad();
 
@@ -160,9 +751,49 @@ function update() {
   ship.y = Math.max(ship.h / 2, Math.min(H - ship.h / 2, ship.y));
 
   // Shooting
-  const shooting = (keys['Space'] || keys['KeyZ']) ||
-    (gp && (btnPressed(gp.buttons[0]) || btnPressed(gp.buttons[7])));
-  if (shooting && !gameOver) {
+  const triggerDown = gp && (btnPressed(gp.buttons[0]) || btnPressed(gp.buttons[7]));
+  const normalShooting = (keys['Space']) || triggerDown;
+  const superShooting = (keys['KeyZ']) ||
+    (gp && btnPressed(gp.buttons[7]));
+
+  // Charge super shot when bar is charged and ship is near bottom
+  if (barState === 'charged' && superShooting && ship.y > H * 0.65) {
+    barState = 'charging';
+    chargeStart = Date.now();
+    startChargeSound();
+  }
+  if (barState === 'charging') {
+    if (!superShooting || ship.y <= H * 0.65) {
+      barState = 'charged';
+      stopChargeSound();
+    } else if (Date.now() - chargeStart >= CHARGE_MS) {
+      // Fire super shot! Weave through every red blob on screen, then hit a pump.
+      stopChargeSound();
+      barState = 'normal';
+      powerBar.bricks = 0;
+      collectedValues.length = 0;
+      const positions = getHosePositions();
+      const remainingHoses = positions.map((_, i) => i).filter(i => !destroyedHoses.has(i));
+      if (remainingHoses.length > 0) {
+        const targetIdx = remainingHoses[Math.floor(Math.random() * remainingHoses.length)];
+        // Gather red blob positions along the way
+        const redWaypoints = lavaParticles
+          .filter(l => l.harmful)
+          .map(l => ({ x: l.x, y: l.y }));
+        const startX = ship.x, startY = ship.y - ship.h / 2;
+        superShot = {
+          x: startX, y: startY,
+          startTime: Date.now(), duration: Math.max(1200, 800 + redWaypoints.length * 200),
+          waypoints: buildZoomPath(startX, startY, targetIdx, redWaypoints),
+          targetIdx, r: 28, trail: [],
+          redBlobsToDestroy: new Set(lavaParticles.filter(l => l.harmful)),
+        };
+      }
+    }
+  }
+
+  // Normal shooting when not charging
+  if (normalShooting && !gameOver && barState !== 'charging') {
     if (Date.now() - lastShot > cfg.shootDelay) {
       lastShot = Date.now();
       bullets.push({
@@ -190,6 +821,41 @@ function update() {
     }
   }
 
+  // Super shot — zooms around the screen, pierces anything, then nails its target hose
+  if (superShot) {
+    const elapsed = Date.now() - superShot.startTime;
+    const t = Math.min(elapsed / superShot.duration, 1);
+    const pos = pointOnPath(superShot.waypoints, t);
+    superShot.x = pos.x;
+    superShot.y = pos.y;
+    superShot.trail.push({ x: pos.x, y: pos.y });
+    if (superShot.trail.length > 18) superShot.trail.shift();
+
+    // Destroy red blobs (both ones in the path set and any new ones the shot passes through)
+    for (let j = lavaParticles.length - 1; j >= 0; j--) {
+      const l = lavaParticles[j];
+      if (!l.harmful) continue;
+      if (Math.hypot(superShot.x - l.x, superShot.y - l.y) < l.r + superShot.r) {
+        createLavaExplosion(l.x, l.y);
+        lavaParticles.splice(j, 1);
+        noSpawnUntil = Date.now() + NO_SPAWN_MS;
+      }
+    }
+
+    if (t >= 1) {
+      const positions = getHosePositions();
+      destroyedHoses.set(superShot.targetIdx, Date.now());
+      if (pumpers[superShot.targetIdx]) pumpers[superShot.targetIdx].destroyed = true;
+      createSplash(positions[superShot.targetIdx], getPumperTipY(superShot.targetIdx) - 10);
+      noSpawnUntil = Date.now() + NO_SPAWN_MS;
+      const remaining = positions.length - destroyedHoses.size;
+      showBanner('Oil Pump destroyed! ' + remaining + ' Left!', '#fc4', 1800);
+      triggerFlash('rgba(255,180,60,0.3)', 250);
+      superShot = null;
+      checkWinCondition();
+    }
+  }
+
   // Lava
   for (let i = lavaParticles.length - 1; i >= 0; i--) {
     const l = lavaParticles[i];
@@ -204,17 +870,61 @@ function update() {
       continue;
     }
     // Collision with ship
-    if (!gameOver && !l.pop) {
+    if (!gameOver) {
       const d = Math.hypot(l.x - ship.x, l.y - ship.y);
       if (d < l.r + ship.w / 2.5) {
-        gameOver = true;
-        gameOverTime = Date.now();
+        if (l.harmful) {
+          gameOver = true;
+          gameOverTime = Date.now();
+          stopGameMusic();
+        } else {
+          // Collect blue lava
+          createSplash(l.x, l.y);
+          lavaParticles.splice(i, 1);
+          if (barState === 'normal') {
+            const val = l.value || 1;
+            const newSum = powerBar.bricks + val;
+            if (newSum === POWER_TARGET) {
+              powerBar.bricks = POWER_TARGET;
+              collectedValues.push(val);
+              barState = 'charged';
+              triggerFlash('rgba(80,255,140,0.35)', 250);
+              showBanner('Target hit! Power ready!', '#4f8', 1600);
+              playPositiveSound();
+            } else if (newSum > POWER_TARGET) {
+              missDisplayValues = [...collectedValues, val];
+              missDisplayUntil = Date.now() + 1600;
+              powerBar.bricks = 0;
+              collectedValues.length = 0;
+              triggerFlash('rgba(255,70,70,0.35)', 250);
+              showBanner('Target missed - power bar reset', '#f66', 1600);
+              playNegativeSound();
+            } else {
+              powerBar.bricks = newSum;
+              collectedValues.push(val);
+            }
+          }
+        }
       }
     }
   }
 
+  updatePumpers();
   // Spawn new lava occasionally
-  if (!gameOver && frame % cfg.lavaSpawnRate === 0) spawnLava();
+  if (!gameOver && frame % cfg.lavaSpawnRate === 0 && Date.now() > noSpawnUntil) spawnLava();
+
+  // Ease the displayed bar fill toward the real value (drives the animated drain on a bust)
+  barDisplay += (powerBar.bricks - barDisplay) * 0.15;
+
+  // Splashes
+  for (let i = splashes.length - 1; i >= 0; i--) {
+    const s = splashes[i];
+    s.x += s.vx;
+    s.y += s.vy;
+    s.vy += 0.05;
+    s.life -= s.decay;
+    if (s.life <= 0) splashes.splice(i, 1);
+  }
 }
 
 // ─── Draw ship (always pointing up) ──────────────
@@ -245,43 +955,51 @@ function drawShip() {
 }
 
 // ─── Draw hoses ──────────────────────────────────
-function drawHoses() {
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 3;
-  for (const hx of getHosePositions()) {
-    ctx.beginPath();
-    ctx.moveTo(hx, hoseY);
-    ctx.lineTo(hx, hoseY + hoseLen);
-    ctx.stroke();
-    // nozzle
-    ctx.lineWidth = 5;
-    ctx.beginPath();
-    ctx.moveTo(hx - 6, hoseY + hoseLen);
-    ctx.lineTo(hx + 6, hoseY + hoseLen);
-    ctx.stroke();
-    ctx.lineWidth = 3;
-  }
-}
-
 // ─── Draw lava ───────────────────────────────────
 function drawLava() {
   for (const l of lavaParticles) {
     const r = l.r + Math.sin(l.phase) * 0.8;
     // Glow effect
     const glow = ctx.createRadialGradient(l.x, l.y, 0, l.x, l.y, r * 2.5);
-    glow.addColorStop(0, `rgba(255, ${120 + 80 * Math.sin(l.phase)}, 0, 0.8)`);
-    glow.addColorStop(0.4, `rgba(255, ${80 + 60 * Math.sin(l.phase + 1)}, 0, 0.5)`);
-    glow.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    if (l.harmful) {
+      glow.addColorStop(0, `rgba(255, ${120 + 80 * Math.sin(l.phase)}, 0, 0.8)`);
+      glow.addColorStop(0.4, `rgba(255, ${80 + 60 * Math.sin(l.phase + 1)}, 0, 0.5)`);
+      glow.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    } else {
+      glow.addColorStop(0, `rgba(100, ${180 + 60 * Math.sin(l.phase)}, 255, 0.8)`);
+      glow.addColorStop(0.4, `rgba(50, ${120 + 60 * Math.sin(l.phase + 1)}, 220, 0.5)`);
+      glow.addColorStop(1, 'rgba(0, 50, 255, 0)');
+    }
     ctx.fillStyle = glow;
     ctx.beginPath();
     ctx.arc(l.x, l.y, r * 2.5, 0, Math.PI * 2);
     ctx.fill();
 
     // Core
-    ctx.fillStyle = `rgb(255, ${160 + 80 * Math.sin(l.phase)}, 20)`;
-    ctx.beginPath();
-    ctx.arc(l.x, l.y, r, 0, Math.PI * 2);
-    ctx.fill();
+    if (l.harmful) {
+      ctx.fillStyle = `rgb(255, ${160 + 80 * Math.sin(l.phase)}, 20)`;
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, r, 0, Math.PI * 2);
+      ctx.fill();
+    } else {
+      ctx.fillStyle = `rgb(100, ${180 + 60 * Math.sin(l.phase)}, 255)`;
+      ctx.beginPath();
+      ctx.arc(l.x, l.y, r, 0, Math.PI * 2);
+      ctx.fill();
+      // Number on blue blob — as big as practicable while still fitting
+      if (r > 5) {
+        const fontSize = Math.max(10, r * 1.6);
+        ctx.font = `bold ${fontSize}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.strokeStyle = 'rgba(0,40,120,0.9)';
+        ctx.lineWidth = Math.max(2, fontSize * 0.12);
+        ctx.strokeText(l.value || '?', l.x, l.y);
+        ctx.fillStyle = '#fff';
+        ctx.fillText(l.value || '?', l.x, l.y);
+        ctx.textBaseline = 'alphabetic';
+      }
+    }
   }
 }
 
@@ -294,17 +1012,22 @@ function drawGameOver() {
   ctx.fillStyle = 'rgba(0,0,0,0.6)';
   ctx.fillRect(0, 0, W, H);
 
-  ctx.fillStyle = '#f44';
-  ctx.font = 'bold 48px monospace';
+  ctx.fillStyle = won ? '#4f8' : '#f44';
+  ctx.font = 'bold 52px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText('GAME OVER', W / 2, H / 2 - 30);
+  ctx.fillText(won ? 'YOU WIN!!' : 'GAME OVER', W / 2, H / 2 - 80);
 
-  ctx.fillStyle = '#555';
-  ctx.font = '20px monospace';
   if (restartReady) {
-    ctx.fillText('A: Restart   B: Menu', W / 2, H / 2 + 30);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 28px monospace';
+    ctx.fillText('A: Restart    B: Menu', W / 2, H / 2 + 20);
   } else {
-    ctx.fillText(`Restart in ${remaining}...   B: Menu`, W / 2, H / 2 + 30);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 72px monospace';
+    ctx.fillText(remaining, W / 2, H / 2 - 10);
+    ctx.fillStyle = '#999';
+    ctx.font = '20px monospace';
+    ctx.fillText('seconds until ready', W / 2, H / 2 + 30);
   }
 }
 
@@ -336,6 +1059,21 @@ function drawMenu() {
   ctx.fillStyle = '#555';
   ctx.font = '14px monospace';
   ctx.fillText('◄/► choose   A: play', W / 2, y + boxH + 50);
+
+  // Pad debug
+  const pad = getGamepad();
+  if (pad) {
+    const ids = [];
+    for (let i = 0; i < pad.buttons.length; i++) {
+      if (btnPressed(pad.buttons[i])) ids.push(i);
+    }
+    ctx.fillStyle = '#888';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'left';
+    const info = 'pad=' + (pad.id || '?').slice(0, 20) + ' pressed=[' + ids.join(',') + ']';
+    ctx.fillText(info, 8, H - 6);
+    ctx.textAlign = 'center';
+  }
 }
 
 function moveMenu(delta) {
@@ -345,9 +1083,12 @@ function moveMenu(delta) {
 function launchGame(i) {
   resetGame();
   state = 'playing';
+  musicMuted = false;
+  startGameMusic();
 }
 
 function backToMenu() {
+  stopGameMusic();
   resetGame();
   state = 'menu';
 }
@@ -360,21 +1101,245 @@ function drawBullets() {
   }
 }
 
+// ─── Draw splashes ───────────────────────────────
+function drawSplashes() {
+  for (const s of splashes) {
+    ctx.globalAlpha = s.life;
+    ctx.fillStyle = s.color || '#48f';
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+// ─── Draw power bar (dispatches to the selected layout) ─
+function drawPowerBar() {
+  if (cfg.uiLayout === 'side') drawPowerBarSide();
+  else drawPowerBarBottom();
+}
+
+// ─── Equation text shared by the bottom layout ───
+function getEquationDisplay() {
+  if (barState === 'charged' || barState === 'charging') {
+    return { text: collectedValues.join(' + ') + ' = ' + POWER_TARGET, color: '#4f8' };
+  }
+  if (missDisplayValues && Date.now() < missDisplayUntil) {
+    return { text: missDisplayValues.join(' + ') + ' ≠ ' + POWER_TARGET, color: '#f66' };
+  }
+  if (collectedValues.length > 0) {
+    return { text: collectedValues.join(' + ') + ' + ? ≠ ' + POWER_TARGET, color: '#8cf' };
+  }
+  return { text: '? ≠ ' + POWER_TARGET, color: '#8cf' };
+}
+
+// ─── Bottom-centered layout (default) ────────────
+function drawPowerBarBottom() {
+  const barW = Math.min(340, W - 40), barH = 26;
+  const bx = W / 2 - barW / 2;
+  const by = H - 66;
+
+  if (barState === 'charging') {
+    const elapsed = Date.now() - chargeStart;
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'center';
+    const dots = '.'.repeat(Math.floor((elapsed / 500) % 4));
+    ctx.fillText('SHOOP' + dots, W / 2, by - 46);
+  }
+
+  const eq = getEquationDisplay();
+  ctx.fillStyle = eq.color;
+  ctx.font = 'bold 32px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(eq.text, W / 2, by - 14);
+
+  // Bar background
+  ctx.fillStyle = '#ddd';
+  ctx.strokeStyle = '#bbb';
+  ctx.lineWidth = 1;
+  ctx.fillRect(bx, by, barW, barH);
+  ctx.strokeRect(bx, by, barW, barH);
+
+  if (barState === 'charged' || barState === 'charging') {
+    const grad = ctx.createLinearGradient(bx, by, bx + barW, by);
+    grad.addColorStop(0, '#48f');
+    grad.addColorStop(0.3, '#8cf');
+    grad.addColorStop(0.6, '#48f');
+    grad.addColorStop(1, '#8cf');
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, barW, barH);
+    ctx.strokeStyle = '#37d';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(bx, by, barW, barH);
+    if (barState === 'charging') {
+      const elapsed = Date.now() - chargeStart;
+      const pct = Math.min(elapsed / CHARGE_MS, 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.fillRect(bx, by, barW * pct, barH);
+    }
+  } else {
+    const pct = Math.max(0, Math.min(barDisplay / POWER_TARGET, 1));
+    ctx.fillStyle = '#48f';
+    ctx.fillRect(bx, by, barW * pct, barH);
+    ctx.strokeStyle = '#37d';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(bx, by, barW * pct, barH);
+  }
+}
+
+// ─── Side vertical layout (legacy, selectable in dev panel) ─
+function drawPowerBarSide() {
+  const brickW = 50, brickH = 20, gap = 3;
+  const x = 12;
+  const barBase = H - 96; // "by" of the bottom-most brick — shifted up to leave room below for the sum + instructions
+  const barTop = barBase - (POWER_TARGET - 1) * (brickH + gap);
+  const barBottomEdge = barBase + brickH;
+
+  // Target label + big number, stacked above the bar
+  ctx.fillStyle = '#888';
+  ctx.font = 'bold 13px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText('TARGET', x, barTop - 46);
+
+  ctx.fillStyle = '#f84';
+  ctx.font = 'bold 40px monospace';
+  ctx.fillText(String(POWER_TARGET), x, barTop - 12);
+
+  if (barState === 'charged' || barState === 'charging') {
+    // Shining gradient bar
+    const barH = POWER_TARGET * (brickH + gap) - gap;
+    const grad = ctx.createLinearGradient(x, barTop, x + brickW, barTop);
+    grad.addColorStop(0, '#48f');
+    grad.addColorStop(0.3, '#8cf');
+    grad.addColorStop(0.6, '#48f');
+    grad.addColorStop(1, '#8cf');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x, barTop, brickW, barH);
+    ctx.strokeStyle = '#37d';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x, barTop, brickW, barH);
+
+    if (barState === 'charging') {
+      // Draw charging progress
+      const elapsed = Date.now() - chargeStart;
+      const pct = Math.min(elapsed / CHARGE_MS, 1);
+      ctx.fillStyle = 'rgba(255,255,255,0.3)';
+      ctx.fillRect(x, barTop + barH * (1 - pct), brickW, barH * pct);
+      // ShooOOOOP text
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 16px monospace';
+      ctx.textAlign = 'center';
+      const dots = '.'.repeat(Math.floor((elapsed / 500) % 4));
+      ctx.fillText('SHOOP' + dots, x + brickW / 2, barTop - 8);
+      ctx.textAlign = 'left';
+    }
+  } else {
+    // Normal bricks
+    for (let i = 0; i < POWER_TARGET; i++) {
+      const by = barBase - i * (brickH + gap);
+      if (i < powerBar.bricks) {
+        ctx.fillStyle = '#48f';
+        ctx.strokeStyle = '#37d';
+      } else {
+        ctx.fillStyle = '#ddd';
+        ctx.strokeStyle = '#bbb';
+      }
+      ctx.lineWidth = 1;
+      ctx.fillRect(x, by, brickW, brickH);
+      ctx.strokeRect(x, by, brickW, brickH);
+    }
+  }
+
+  // Running sum, e.g. "3 + 4", below the bar
+  if (collectedValues.length > 0) {
+    ctx.fillStyle = '#8cf';
+    ctx.font = 'bold 16px monospace';
+    ctx.textAlign = 'left';
+    ctx.fillText(collectedValues.join(' + '), x, barBottomEdge + 22);
+  }
+}
+
+// ─── Draw super shot: big, glowing, with a zoom trail ─
+function drawSuperShot() {
+  if (!superShot) return;
+  for (let i = 0; i < superShot.trail.length; i++) {
+    const p = superShot.trail[i];
+    const alpha = (i + 1) / superShot.trail.length;
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.fillStyle = '#8cf';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, superShot.r * 0.6 * alpha, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  const glow = ctx.createRadialGradient(superShot.x, superShot.y, 0, superShot.x, superShot.y, superShot.r * 3);
+  glow.addColorStop(0, 'rgba(140,200,255,0.9)');
+  glow.addColorStop(0.5, 'rgba(80,140,255,0.4)');
+  glow.addColorStop(1, 'rgba(80,140,255,0)');
+  ctx.fillStyle = glow;
+  ctx.beginPath();
+  ctx.arc(superShot.x, superShot.y, superShot.r * 3, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#8cf';
+  ctx.shadowColor = '#8cf';
+  ctx.shadowBlur = 30;
+  ctx.beginPath();
+  ctx.arc(superShot.x, superShot.y, superShot.r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  ctx.fillStyle = '#fff';
+  ctx.beginPath();
+  ctx.arc(superShot.x - superShot.r * 0.3, superShot.y - superShot.r * 0.3, superShot.r * 0.35, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// ─── Draw screen flash + banner messages ─────────
+function drawFlashAndBanner() {
+  if (Date.now() < flashUntil) {
+    ctx.fillStyle = flashColor;
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (bannerText) {
+    if (Date.now() < bannerUntil) {
+      ctx.fillStyle = bannerColor;
+      ctx.font = 'bold 32px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(bannerText, W / 2, H * 0.3);
+    } else {
+      bannerText = null;
+    }
+  }
+}
+
 // ─── Draw UI ─────────────────────────────────────
 function drawUI() {
+  drawPowerBar();
   ctx.fillStyle = '#555';
   ctx.font = '14px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText('Arrows/WASD move  |  Space/Z shoot  |  Gamepad supported', 12, H - 20);
+  ctx.fillText('Arrows/WASD move  |  Space/Z shoot  |  Gamepad supported', 12, H - 12);
+  // Music indicator
+  ctx.textAlign = 'right';
+  ctx.fillStyle = musicMuted ? '#666' : '#8cf';
+  ctx.font = '12px monospace';
+  ctx.fillText(musicMuted ? '♫ MUTED' : '♫ LAVA CORE', W - 12, H - 12);
+  ctx.textAlign = 'left';
 }
 
 // ─── Main loop ───────────────────────────────────
 function draw() {
-  drawHoses();
+  drawPumpers();
   drawLava();
+  drawSplashes();
+  drawSuperShot();
   drawBullets();
   drawShip();
   drawUI();
+  drawFlashAndBanner();
 
   if (gameOver) drawGameOver();
 }
@@ -394,8 +1359,26 @@ function loop() {
 // ─── Restart ─────────────────────────────────────
 function resetGame() {
   gameOver = false;
+  won = false;
+  winDelayUntil = 0;
   lavaParticles.length = 0;
   bullets.length = 0;
+  splashes.length = 0;
+  powerBar.bricks = 0;
+  collectedValues.length = 0;
+  barDisplay = 0;
+  missDisplayValues = null;
+  barState = 'normal';
+  chargeStart = 0;
+  superShot = null;
+  noSpawnUntil = 0;
+  destroyedHoses.clear();
+  randomPowerTarget();
+  initPumpers();
+  flashUntil = 0;
+  bannerText = null;
+  stopChargeSound();
+  stopGameMusic();
   ship.x = W / 2;
   ship.y = H - 60;
 }
@@ -407,6 +1390,7 @@ window.addEventListener('keydown', e => {
   if (e.repeat) return;
   const isA = e.code === 'Enter' || e.code === 'Space' || e.code === 'KeyZ';
   const isB = e.code === 'Escape' || e.code === 'Backspace' || e.code === 'KeyX';
+  const isM = e.code === 'KeyM';
 
   if (state === 'menu') {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') moveMenu(-1);
@@ -414,24 +1398,33 @@ window.addEventListener('keydown', e => {
     if (isA) launchGame(menuIndex);
   } else if (gameOver) {
     if (isA && canRestart()) doRestart();
-    if (isB) backToMenu();
+    if (isB && canRestart()) backToMenu();
   }
+  if (isM) { musicMuted = !musicMuted; if (musicMuted) stopGameMusic(); else startGameMusic(); }
 });
 
 // ─── Gamepad: menu / game-over actions (edge-triggered) ─
 function handleGamepadInput() {
-  const gp = getGamepad();
-  if (gp) {
-    if (state === 'menu') {
-      if (gpEdge(DPAD_LEFT)) moveMenu(-1);
-      if (gpEdge(DPAD_RIGHT)) moveMenu(1);
-      if (gpEdge(BTN_A)) launchGame(menuIndex);
-    } else if (gameOver) {
-      if (gpEdge(BTN_A) && canRestart()) doRestart();
-      if (gpEdge(BTN_B)) backToMenu();
+  try {
+    const gp = getGamepad();
+    if (gp) {
+      if (state === 'menu') {
+        if (gpEdge(DPAD_LEFT)) moveMenu(-1);
+        if (gpEdge(DPAD_RIGHT)) moveMenu(1);
+        if (gpEdge(BTN_A)) launchGame(menuIndex);
+      } else if (gameOver) {
+        if (gpEdge(BTN_A) && canRestart()) doRestart();
+        if (gpEdge(BTN_B) && canRestart()) backToMenu();
+      } else if (state === 'playing' && !gameOver) {
+        // D-pad Up toggles music
+        if (gpEdge(12)) {
+          musicMuted = !musicMuted;
+          if (musicMuted) stopGameMusic(); else startGameMusic();
+        }
+      }
     }
-  }
-  prevGpButtons = gp ? gp.buttons.map(b => btnPressed(b)) : [];
+    prevGpButtons = gp ? gp.buttons.map(b => btnPressed(b)) : [];
+  } catch (e) { reportError(e); }
 }
 
 requestAnimationFrame(loop);

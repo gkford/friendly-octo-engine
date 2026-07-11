@@ -8,7 +8,9 @@
     h1 { color: #f84; margin-bottom: 24px; }
     .group { margin-bottom: 20px; }
     label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 14px; }
-    input[type=range] { width: 260px; }
+    input[type=range] { width: 200px; }
+    input[type=number] { width: 60px; background: #333; color: #f84; font-family: monospace; font-size: 14px; padding: 2px 4px; border: 1px solid #555; border-radius: 3px; text-align: right; margin-left: 8px; -moz-appearance: textfield; }
+    input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
     .val { width: 50px; text-align: right; color: #f84; }
     button { margin-top: 20px; padding: 10px 24px; background: #f84; border: none; color: #000; font-family: monospace; font-size: 16px; font-weight: bold; cursor: pointer; border-radius: 4px; }
     button:hover { background: #fa6; }
@@ -20,56 +22,307 @@
 
 <div class="group">
   <label>Lava speed <span class="val" id="lavaSpeed-val"></span></label>
-  <input type="range" id="lavaSpeed" min="0.05" max="10" step="0.05">
+  <input type="range" id="lavaSpeed" min="0.01" max="0.5" step="0.005">
+  <input type="number" id="lavaSpeed-num" min="0.01" max="0.5" step="0.005">
 </div>
 <div class="group">
-  <label>Lava size <span class="val" id="lavaSize-val"></span></label>
-  <input type="range" id="lavaSize" min="1" max="300" step="1">
+  <label>Lava min size <span class="val" id="lavaSizeMin-val"></span></label>
+  <input type="range" id="lavaSizeMin" min="1" max="500" step="1">
+  <input type="number" id="lavaSizeMin-num" min="1" max="500" step="1">
+</div>
+<div class="group">
+  <label>Lava max size <span class="val" id="lavaSizeMax-val"></span></label>
+  <input type="range" id="lavaSizeMax" min="1" max="500" step="1">
+  <input type="number" id="lavaSizeMax-num" min="1" max="500" step="1">
+</div>
+<div class="group" id="stdGroup">
+  <label>Std deviation <span class="val" id="lavaSizeStd-val"></span></label>
+  <input type="range" id="lavaSizeStd" min="1" max="50" step="0.5">
+  <input type="number" id="lavaSizeStd-num" min="1" max="50" step="0.5">
+</div>
+<div class="group">
+  <label>Harm threshold <span class="val" id="lavaHarmPercent-val">50%</span> <span class="val" id="harmThreshold">≥ 30</span></label>
+  <div><small style="color:#888">blobs this size or larger are red (danger)</small></div>
+  <input type="range" id="lavaHarmPercent" min="0" max="100" step="1" value="50" style="width:200px;">
+  <input type="number" id="lavaHarmPercent-num" min="0" max="100" step="1" value="50">
+  <div><span style="color:#888;font-size:12px;">% between min &amp; max — </span><span style="color:#f84;font-size:12px;">0% = all blue</span><span style="color:#888;font-size:12px;">, </span><span style="color:#f84;font-size:12px;">100% = all red</span><span style="color:#888;font-size:12px;">, </span><span style="color:#f84;font-size:12px;">50% = half</span></div>
 </div>
 <div class="group">
   <label>Lava spawn rate (frames) <span class="val" id="lavaSpawnRate-val"></span></label>
   <input type="range" id="lavaSpawnRate" min="5" max="500" step="5">
+  <input type="number" id="lavaSpawnRate-num" min="5" max="500" step="5">
 </div>
 <div class="group">
   <label>Number of hoses <span class="val" id="hoseCount-val"></span></label>
   <input type="range" id="hoseCount" min="1" max="100" step="1">
+  <input type="number" id="hoseCount-num" min="1" max="100" step="1">
 </div>
 <div class="group">
   <label>Ship size <span class="val" id="shipSize-val"></span></label>
   <input type="range" id="shipSize" min="5" max="100" step="1">
+  <input type="number" id="shipSize-num" min="5" max="100" step="1">
+</div>
+<div class="group">
+  <label>Ship speed <span class="val" id="shipSpeed-val"></span></label>
+  <input type="range" id="shipSpeed" min="0.5" max="20" step="0.5">
+  <input type="number" id="shipSpeed-num" min="0.5" max="20" step="0.5">
 </div>
 <div class="group">
   <label>Restart delay (seconds) <span class="val" id="restartDelay-val"></span></label>
   <input type="range" id="restartDelay" min="0" max="30" step="0.5">
+  <input type="number" id="restartDelay-num" min="0" max="30" step="0.5">
+</div>
+<div class="group">
+  <label>Power bar layout <span class="val" id="uiLayout-val"></span></label>
+  <select id="uiLayout" style="background:#333; color:#eee; font-family:monospace; font-size:14px; padding:4px; border:1px solid #555; border-radius:3px;">
+    <option value="bottom">Bottom</option>
+    <option value="side">Side</option>
+  </select>
 </div>
 
 <button onclick="push()">Push to game</button>
+<button onclick="restoreDefaults()" style="background:#888;">Restore defaults</button>
+<button id="resetBtn" onclick="resetGame()" style="background:#c44;">🔁 Reset client</button>
 <div id="status">Loading config...</div>
 
 <script>
-const fields = ['lavaSpeed','lavaSize','lavaSpawnRate','hoseCount','shipSize','restartDelay'];
+const DEFAULTS = {
+  lavaSpeed: 0.5,
+  lavaSizeMin: 10,
+  lavaSizeMax: 50,
+  lavaHarmPercent: 50,
+  lavaSpawnRate: 80,
+  hoseCount: 2,
+  shipSize: 24,
+  shipSpeed: 4,
+  restartDelay: 5,
+  lavaSizeStd: 4,
+};
+const rangeFields = ['lavaSpeed','lavaSizeMin','lavaSizeMax','lavaSpawnRate','hoseCount','shipSize','shipSpeed','restartDelay','lavaSizeStd','lavaHarmPercent'];
+const selectFields = ['uiLayout'];
+
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+function handleNumInput(id) {
+  const rangeEl = document.getElementById(id);
+  const numEl = document.getElementById(id + '-num');
+  const valEl = document.getElementById(id + '-val');
+  const raw = parseFloat(numEl.value);
+  if (isNaN(raw)) return;
+  const min = parseFloat(rangeEl.min), max = parseFloat(rangeEl.max);
+  const clamped = clamp(raw, min, max);
+  rangeEl.value = clamped;
+  if (id === 'lavaHarmPercent') {
+    valEl.textContent = clamped + '%';
+  } else {
+    valEl.textContent = clamped;
+  }
+}
+
+function handleNumBlur(id) {
+  const rangeEl = document.getElementById(id);
+  const numEl = document.getElementById(id + '-num');
+  const valEl = document.getElementById(id + '-val');
+  let raw = parseFloat(numEl.value);
+  if (isNaN(raw)) return;
+  const min = parseFloat(rangeEl.min), max = parseFloat(rangeEl.max);
+  const clamped = clamp(raw, min, max);
+  rangeEl.value = clamped;
+  numEl.value = clamped;
+  if (id === 'lavaHarmPercent') {
+    valEl.textContent = clamped + '%';
+  } else {
+    valEl.textContent = clamped;
+  }
+}
 
 async function load() {
   const res = await fetch('/config');
   const cfg = await res.json();
-  for (const f of fields) {
-    document.getElementById(f).value = cfg[f];
-    document.getElementById(f + '-val').textContent = cfg[f];
+  for (const f of rangeFields) {
+    const rangeEl = document.getElementById(f);
+    const numEl = document.getElementById(f + '-num');
+    numEl.value = cfg[f];
+    rangeEl.value = cfg[f];
   }
+  document.getElementById('lavaSpeed-val').textContent = cfg.lavaSpeed;
+  document.getElementById('lavaSizeMin-val').textContent = cfg.lavaSizeMin;
+  document.getElementById('lavaSizeMax-val').textContent = cfg.lavaSizeMax;
+  document.getElementById('lavaSizeStd-val').textContent = cfg.lavaSizeStd;
+  document.getElementById('lavaHarmPercent-val').textContent = cfg.lavaHarmPercent + '%';
+  document.getElementById('harmThreshold').textContent = '≥ ' + Math.round(cfg.lavaSizeMin + (cfg.lavaHarmPercent / 100) * (cfg.lavaSizeMax - cfg.lavaSizeMin));
+  document.getElementById('lavaSpawnRate-val').textContent = cfg.lavaSpawnRate;
+  document.getElementById('hoseCount-val').textContent = cfg.hoseCount;
+  document.getElementById('shipSize-val').textContent = cfg.shipSize;
+  document.getElementById('shipSpeed-val').textContent = cfg.shipSpeed;
+  document.getElementById('restartDelay-val').textContent = cfg.restartDelay;
+  for (const f of selectFields) {
+    document.getElementById(f).value = cfg[f];
+    document.getElementById(f + '-val').textContent = cfg[f].charAt(0).toUpperCase() + cfg[f].slice(1);
+  }
+  toggleStdGroup();
   document.getElementById('status').textContent = 'Loaded from server.';
 }
 
-for (const f of fields) {
-  document.getElementById(f).addEventListener('input', () => {
-    document.getElementById(f + '-val').textContent = document.getElementById(f).value;
+for (const f of rangeFields) {
+  const rangeEl = document.getElementById(f);
+  const numEl = document.getElementById(f + '-num');
+  rangeEl.addEventListener('input', () => {
+    const valEl = document.getElementById(f + '-val');
+    if (f === 'lavaHarmPercent') {
+      valEl.textContent = rangeEl.value + '%';
+    } else {
+      valEl.textContent = rangeEl.value;
+    }
+    numEl.value = rangeEl.value;
   });
+  numEl.addEventListener('input', () => handleNumInput(f));
+  numEl.addEventListener('blur', () => handleNumBlur(f));
+}
+for (const f of selectFields) {
+  document.getElementById(f).addEventListener('change', () => {
+    const v = document.getElementById(f).value;
+    document.getElementById(f + '-val').textContent = v.charAt(0).toUpperCase() + v.slice(1);
+  });
+}
+
+const rangeBounds = {
+  lavaSpeed: [0.01, 0.5],
+  lavaSizeMin: [1, 500],
+  lavaSizeMax: [1, 500],
+  lavaSizeStd: [1, 50],
+  lavaHarmPercent: [0, 100],
+  lavaSpawnRate: [5, 500],
+  hoseCount: [1, 100],
+  shipSize: [5, 100],
+  shipSpeed: [0.5, 20],
+  restartDelay: [0, 30],
+};
+
+document.getElementById('lavaSizeMin').addEventListener('input', function() {
+  const max = parseFloat(document.getElementById('lavaSizeMax').value);
+  const numEl = document.getElementById('lavaSizeMin-num');
+  let v = Math.max(1, Math.min(parseFloat(this.value), max));
+  this.value = v;
+  numEl.value = v;
+  document.getElementById('lavaSizeMin-val').textContent = v;
+  updateHarmThreshold();
+});
+document.getElementById('lavaSizeMin-num').addEventListener('input', function() {
+  const raw = parseFloat(this.value);
+  const max = parseFloat(document.getElementById('lavaSizeMax').value);
+  if (isNaN(raw)) return;
+  const clamped = clamp(raw, 1, max);
+  document.getElementById('lavaSizeMin').value = clamped;
+  document.getElementById('lavaSizeMin-val').textContent = clamped;
+  updateHarmThreshold();
+});
+document.getElementById('lavaSizeMax').addEventListener('input', function() {
+  const min = parseFloat(document.getElementById('lavaSizeMin').value);
+  const numEl = document.getElementById('lavaSizeMax-num');
+  let v = Math.max(parseFloat(this.value), min);
+  this.value = v;
+  numEl.value = v;
+  document.getElementById('lavaSizeMax-val').textContent = v;
+  updateHarmThreshold();
+});
+document.getElementById('lavaSizeMax-num').addEventListener('input', function() {
+  const raw = parseFloat(this.value);
+  const minVal = parseFloat(document.getElementById('lavaSizeMin').value);
+  if (isNaN(raw)) return;
+  document.getElementById('lavaSizeMax').value = Math.max(raw, minVal);
+  document.getElementById('lavaSizeMax-val').textContent = Math.max(raw, minVal);
+  updateHarmThreshold();
+});
+document.getElementById('lavaHarmPercent').addEventListener('input', function() {
+  document.getElementById('lavaHarmPercent-num').value = this.value;
+  document.getElementById('lavaHarmPercent-val').textContent = this.value + '%';
+  updateHarmThreshold();
+});
+document.getElementById('lavaHarmPercent-num').addEventListener('input', function() {
+  const raw = parseFloat(this.value);
+  if (isNaN(raw)) return;
+  const clamped = clamp(raw, 0, 100);
+  document.getElementById('lavaHarmPercent').value = clamped;
+  document.getElementById('lavaHarmPercent-val').textContent = clamped + '%';
+  updateHarmThreshold();
+});
+document.getElementById('lavaHarmPercent-num').addEventListener('blur', function() {
+  let raw = parseFloat(this.value);
+  if (isNaN(raw)) return;
+  const clamped = clamp(raw, 0, 100);
+  this.value = clamped;
+  document.getElementById('lavaHarmPercent').value = clamped;
+  document.getElementById('lavaHarmPercent-val').textContent = clamped + '%';
+  updateHarmThreshold();
+});
+document.getElementById('lavaSizeMin-num').addEventListener('blur', function() {
+  let raw = parseFloat(this.value);
+  const max = parseFloat(document.getElementById('lavaSizeMax').value);
+  if (isNaN(raw)) return;
+  const clamped = clamp(raw, 1, max);
+  this.value = clamped;
+  document.getElementById('lavaSizeMin').value = clamped;
+  document.getElementById('lavaSizeMin-val').textContent = clamped;
+  updateHarmThreshold();
+});
+document.getElementById('lavaSizeMax-num').addEventListener('blur', function() {
+  let raw = parseFloat(this.value);
+  const minVal = parseFloat(document.getElementById('lavaSizeMin').value);
+  if (isNaN(raw)) return;
+  const clamped = Math.max(raw, minVal);
+  this.value = clamped;
+  document.getElementById('lavaSizeMax').value = clamped;
+  document.getElementById('lavaSizeMax-val').textContent = clamped;
+  updateHarmThreshold();
+});
+
+function updateHarmThreshold() {
+  const min = parseFloat(document.getElementById('lavaSizeMin').value);
+  const max = parseFloat(document.getElementById('lavaSizeMax').value);
+  const pct = parseFloat(document.getElementById('lavaHarmPercent').value);
+  const harmThreshold = Math.round(min + (pct / 100) * (max - min));
+  document.getElementById('harmThreshold').textContent = '≥ ' + harmThreshold;
+}
+
+function toggleStdGroup() {
+  document.getElementById('stdGroup').style.display = 'none';
+}
+
+async function resetGame() {
+  document.getElementById('resetBtn').disabled = true;
+  document.getElementById('resetBtn').textContent = '⏳ Resetting...';
+  await fetch('/reset', { method: 'POST' });
+  document.getElementById('status').textContent = 'Reset sent at ' + new Date().toLocaleTimeString();
+  setTimeout(() => {
+    document.getElementById('resetBtn').disabled = false;
+    document.getElementById('resetBtn').textContent = '🔁 Reset client';
+  }, 2000);
 }
 
 async function push() {
   const body = {};
-  for (const f of fields) body[f] = parseFloat(document.getElementById(f).value);
+  for (const f of rangeFields) body[f] = parseFloat(document.getElementById(f).value);
+  for (const f of selectFields) body[f] = document.getElementById(f).value;
   await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
   document.getElementById('status').textContent = 'Pushed at ' + new Date().toLocaleTimeString();
+}
+
+function restoreDefaults() {
+  for (const f of rangeFields) {
+    const rangeEl = document.getElementById(f);
+    const numEl = document.getElementById(f + '-num');
+    rangeEl.value = DEFAULTS[f];
+    numEl.value = DEFAULTS[f];
+    rangeEl.dispatchEvent(new Event('input'));
+  }
+  for (const f of selectFields) {
+    document.getElementById(f).value = 'bottom';
+    document.getElementById(f + '-val').textContent = 'Bottom';
+  }
+  updateHarmThreshold();
+  document.getElementById('status').textContent = 'Restored to defaults.';
 }
 
 load();

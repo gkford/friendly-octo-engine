@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound Lab</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: monospace; padding: 24px; max-width: 900px; margin: 0 auto;
+      background: #111; color: #ddd;
+    }
+    h1 { color: #f84; font-size: 26px; margin-bottom: 6px; }
+    .subtitle { color: #888; font-size: 13px; margin-bottom: 24px; }
+    h2 {
+      color: #4af; font-size: 18px; margin: 28px 0 14px; padding-bottom: 6px;
+      border-bottom: 1px solid #333;
+    }
+    .actions-grid {
+      display: grid; gap: 10px;
+    }
+    .action-card {
+      background: #1e1e1e; border: 1px solid #333; border-radius: 6px;
+      padding: 14px; transition: border-color 0.2s;
+    }
+    .action-card:hover { border-color: #555; }
+    .action-card.playing { border-color: #4af; box-shadow: 0 0 12px rgba(68,170,255,0.15); }
+    .action-header {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin-bottom: 10px;
+    }
+    .action-label {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .action-label .icon {
+      font-size: 18px; width: 28px; text-align: center;
+    }
+    .action-label .name {
+      font-weight: bold; font-size: 14px;
+    }
+    .action-label .hint {
+      color: #666; font-size: 11px; font-weight: normal; margin-left: 8px;
+    }
+    .play-btn {
+      background: #2a2a2a; border: 1px solid #555; color: #4af;
+      padding: 5px 14px; border-radius: 4px; cursor: pointer;
+      font-family: monospace; font-size: 13px; font-weight: bold;
+      transition: all 0.15s; white-space: nowrap;
+    }
+    .play-btn:hover { background: #333; border-color: #4af; }
+    .play-btn:active { background: #4af; color: #000; }
+    .play-btn.previewing { background: #4af; color: #000; border-color: #4af; }
+    .action-controls {
+      display: flex; flex-wrap: wrap; gap: 10px 18px;
+    }
+    .ctrl-group {
+      display: flex; flex-direction: column; gap: 2px; min-width: 80px;
+    }
+    .ctrl-group label {
+      font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .ctrl-group input, .ctrl-group select {
+      background: #2a2a2a; border: 1px solid #444; border-radius: 3px;
+      color: #eee; font-family: monospace; font-size: 12px;
+      padding: 3px 6px;
+    }
+    .ctrl-group input[type=range] {
+      width: 100px; padding: 0; background: transparent; accent-color: #4af;
+    }
+    .ctrl-group .val { color: #f84; font-size: 12px; min-width: 24px; display: inline-block; }
+    .ctrl-row { display: flex; align-items: center; gap: 6px; }
+    .ctrl-row .val { min-width: 32px; }
+    select { cursor: pointer; }
+    select option { background: #1e1e1e; color: #eee; }
+
+    /* Music section */
+    .music-section {
+      background: #1a1a2a; border: 1px solid #336; border-radius: 8px;
+      padding: 18px; margin-top: 10px;
+    }
+    .music-top {
+      display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .music-top select {
+      background: #2a2a3a; border: 1px solid #448; border-radius: 4px;
+      color: #eee; font-family: monospace; font-size: 14px;
+      padding: 6px 10px; min-width: 180px;
+    }
+    .music-btn {
+      background: #2a2a3a; border: 1px solid #448; color: #8cf;
+      padding: 7px 20px; border-radius: 4px; cursor: pointer;
+      font-family: monospace; font-size: 14px; font-weight: bold;
+      transition: all 0.15s;
+    }
+    .music-btn:hover { background: #333; border-color: #8cf; }
+    .music-btn.playing { background: #f44; color: #fff; border-color: #f44; }
+    .music-btn.playing:hover { background: #f66; }
+    .music-controls {
+      display: flex; flex-wrap: wrap; gap: 16px 30px;
+    }
+    .music-controls .ctrl-group label { color: #8af; }
+    .music-controls .ctrl-group input[type=range] { accent-color: #8cf; }
+    .music-controls .ctrl-group .val { color: #8cf; }
+    .track-info {
+      margin-top: 10px; font-size: 12px; color: #668;
+      line-height: 1.5;
+    }
+
+    /* Preset buttons */
+    .preset-row {
+      display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0 4px;
+    }
+    .preset-btn {
+      background: #2a2a2a; border: 1px solid #444; color: #aaa;
+      padding: 3px 10px; border-radius: 3px; cursor: pointer;
+      font-family: monospace; font-size: 11px;
+      transition: all 0.1s;
+    }
+    .preset-btn:hover { border-color: #f84; color: #f84; }
+    .preset-btn.active { background: #f84; color: #000; border-color: #f84; }
+
+    .push-bar {
+      display: flex; align-items: center; gap: 14px;
+      margin-top: 28px; padding-top: 16px; border-top: 1px solid #333;
+    }
+    .push-btn {
+      background: #f84; border: none; color: #000;
+      padding: 10px 28px; border-radius: 4px; cursor: pointer;
+      font-family: monospace; font-size: 16px; font-weight: bold;
+      transition: background 0.15s;
+    }
+    .push-btn:hover { background: #fa6; }
+    .push-btn:disabled { background: #555; color: #888; cursor: default; }
+    #status { font-size: 12px; color: #888; }
+
+    .collapse-toggle {
+      background: none; border: none; color: #555; cursor: pointer;
+      font-family: monospace; font-size: 12px; margin-bottom: 6px;
+    }
+    .collapse-toggle:hover { color: #888; }
+
+    .loading { opacity: 0.4; pointer-events: none; }
+
+    @media (max-width: 600px) {
+      .action-controls { gap: 6px 12px; }
+      .ctrl-group { min-width: 60px; }
+      .ctrl-group input[type=range] { width: 60px; }
+    }
+  </style>
+</head>
+<body>
+  <h1>🔊 Sound Lab</h1>
+  <div class="subtitle">Design sound effects &amp; preview procedural music tracks</div>
+
+  <!-- ===== Sound Effects ===== -->
+  <h2>🎯 Sound Effects <span style="font-size:12px;color:#666;font-weight:normal;">— per action</span></h2>
+  <div class="actions-grid" id="fxGrid"></div>
+
+  <button class="collapse-toggle" id="collapseAllBtn" onclick="toggleCollapseAll()">▸ Collapse all</button>
+
+  <!-- ===== Music ===== -->
+  <h2>🎵 Music Tracks <span style="font-size:12px;color:#666;font-weight:normal;">— procedural, generated live</span></h2>
+  <div class="music-section">
+    <div class="music-top">
+      <select id="trackSelect" onchange="onTrackChange()"></select>
+      <button class="music-btn" id="musicPlayBtn" onclick="toggleMusic()">▶ Play</button>
+      <span style="font-size:12px;color:#666;">Tempo</span>
+      <input type="range" id="musicTempo" min="40" max="220" value="130" style="width:100px;" oninput="updateMusicDisplay()">
+      <span class="val" id="musicTempoVal" style="color:#8cf;font-size:13px;min-width:30px;">130</span>
+      <span style="font-size:12px;color:#666;">Vol</span>
+      <input type="range" id="musicVolume" min="0" max="100" value="35" style="width:70px;" oninput="updateMusicDisplay()">
+      <span class="val" id="musicVolumeVal" style="color:#8cf;font-size:13px;min-width:24px;">35</span>
+    </div>
+    <div class="track-info" id="trackInfo">Select a track and press Play.</div>
+  </div>
+
+  <!-- ===== Push to Server ===== -->
+  <div class="push-bar">
+    <button class="push-btn" id="pushBtn" onclick="pushToServer()">📡 Push to game</button>
+    <span id="status">Ready.</span>
+  </div>
+
+  <script>
+  // ─── Audio context (lazy) ──────────────────────────
+  let ac = null;
+  function getAC() {
+    if (!ac) ac = new (window.AudioContext || window.webkitAudioContext)();
+    if (ac.state === 'suspended') ac.resume();
+    return ac;
+  }
+
+  // ─── Action definitions ────────────────────────────
+  const ACTIONS = [
+    { id:'shoot',          icon:'🔫', name:'Shoot',          hint:'normal bullet fire',
+      defaults:{ waveform:'square', freq:400, freq2:0, dur:0.08, vol:0.12, env:'none' } },
+    { id:'collect',        icon:'💎', name:'Collect blue',   hint:'picked up blue lava',
+      defaults:{ waveform:'triangle', freq:523, freq2:784, dur:0.35, vol:0.18, env:'ascend' } },
+    { id:'overshoot',      icon:'💥', name:'Overshoot',      hint:'missed target sum',
+      defaults:{ waveform:'sawtooth', freq:220, freq2:80, dur:0.4, vol:0.18, env:'descend' } },
+    { id:'hit_lava',       icon:'🔥', name:'Hit lava',        hint:'bullet destroys harmful lava',
+      defaults:{ waveform:'triangle', freq:880, freq2:440, dur:0.15, vol:0.12, env:'descend' } },
+    { id:'damage',         icon:'💔', name:'Player hit',      hint:'took damage / game over',
+      defaults:{ waveform:'sawtooth', freq:180, freq2:50, dur:0.6, vol:0.25, env:'descend' } },
+    { id:'gameover',       icon:'💀', name:'Game Over',       hint:'you died',
+      defaults:{ waveform:'sawtooth', freq:300, freq2:40, dur:0.8, vol:0.3, env:'descend' } },
+    { id:'win',            icon:'🏆', name:'Win',            hint:'all hoses destroyed',
+      defaults:{ waveform:'triangle', freq:523, freq2:1047, dur:0.9, vol:0.25, env:'ascend' } },
+    { id:'menu_move',      icon:'◀▶', name:'Menu move',      hint:'selector change',
+      defaults:{ waveform:'square', freq:660, freq2:0, dur:0.05, vol:0.08, env:'none' } },
+    { id:'menu_confirm',   icon:'✅', name:'Menu confirm',    hint:'launch game',
+      defaults:{ waveform:'triangle', freq:440, freq2:880, dur:0.2, vol:0.15, env:'ascend' } },
+    { id:'charge_start',   icon:'⚡', name:'Charge begin',    hint:'start super charge',
+      defaults:{ waveform:'sawtooth', freq:150, freq2:900, dur:4.0, vol:0.1, env:'ascend' } },
+    { id:'charge_ready',   icon:'🔋', name:'Charge ready',    hint:'bar is full',
+      defaults:{ waveform:'triangle', freq:784, freq2:988, dur:0.3, vol:0.2, env:'ascend' } },
+    { id:'supershot_fire', icon:'💫', name:'Super shot fire', hint:'unleash the zoom',
+      defaults:{ waveform:'sawtooth', freq:200, freq2:1400, dur:0.5, vol:0.22, env:'ascend' } },
+    { id:'hose_destroy',   icon:'🔧', name:'Hose destroyed',  hint:'pump taken out!',
+      defaults:{ waveform:'triangle', freq:440, freq2:880, dur:0.6, vol:0.2, env:'ascend' } },
+  ];
+
+  // State: params for each action
+  const params = {};
+  let collapsed = false;
+
+  // ─── Build the UI ──────────────────────────────────
+  function buildUI() {
+    const grid = document.getElementById('fxGrid');
+    grid.innerHTML = '';
+    for (const a of ACTIONS) {
+      const p = params[a.id] = { ...a.defaults };
+      const card = document.createElement('div');
+      card.className = 'action-card';
+      card.id = 'card-' + a.id;
+
+      card.innerHTML = `
+        <div class="action-header">
+          <div class="action-label">
+            <span class="icon">${a.icon}</span>
+            <span class="name">${a.name}</span>
+            <span class="hint">${a.hint}</span>
+          </div>
+          <button class="play-btn" onclick="previewSound('${a.id}')">▶ Preview</button>
+        </div>
+        <div class="action-controls">
+          <div class="ctrl-group">
+            <label>Wave</label>
+            <select data-id="${a.id}" data-key="waveform" onchange="updateParam(this)" style="width:84px;">
+              <option value="sine" ${p.waveform==='sine'?'selected':''}>Sine</option>
+              <option value="square" ${p.waveform==='square'?'selected':''}>Square</option>
+              <option value="triangle" ${p.waveform==='triangle'?'selected':''}>Triangle</option>
+              <option value="sawtooth" ${p.waveform==='sawtooth'?'selected':''}>Sawtooth</option>
+            </select>
+          </div>
+          <div class="ctrl-group">
+            <label>Freq (Hz)</label>
+            <div class="ctrl-row">
+              <input type="range" min="30" max="2000" value="${p.freq}" step="1"
+                     oninput="updateParam(this); document.getElementById('freqVal-${a.id}').textContent=this.value">
+              <span class="val" id="freqVal-${a.id}">${p.freq}</span>
+            </div>
+          </div>
+          <div class="ctrl-group">
+            <label>Freq 2 (0=off)</label>
+            <div class="ctrl-row">
+              <input type="range" min="0" max="2000" value="${p.freq2}" step="1"
+                     oninput="updateParam(this); document.getElementById('freq2Val-${a.id}').textContent=this.value">
+              <span class="val" id="freq2Val-${a.id}">${p.freq2}</span>
+            </div>
+          </div>
+          <div class="ctrl-group">
+            <label>Duration</label>
+            <div class="ctrl-row">
+              <input type="range" min="0.01" max="5" value="${p.dur}" step="0.01"
+                     oninput="updateParam(this); document.getElementById('durVal-${a.id}').textContent=parseFloat(this.value).toFixed(2)">
+              <span class="val" id="durVal-${a.id}">${p.dur.toFixed(2)}</span>
+            </div>
+          </div>
+          <div class="ctrl-group">
+            <label>Volume</label>
+            <div class="ctrl-row">
+              <input type="range" min="0" max="100" value="${Math.round(p.vol*100)}" step="1"
+                     oninput="updateParam(this,true); document.getElementById('volVal-${a.id}').textContent=this.value+'%'">
+              <span class="val" id="volVal-${a.id}">${Math.round(p.vol*100)}%</span>
+            </div>
+          </div>
+          <div class="ctrl-group">
+            <label>Envelope</label>
+            <select data-id="${a.id}" data-key="env" onchange="updateParam(this)" style="width:82px;">
+              <option value="none" ${p.env==='none'?'selected':''}>None</option>
+              <option value="ascend" ${p.env==='ascend'?'selected':''}>Ascend</option>
+              <option value="descend" ${p.env==='descend'?'selected':''}>Descend</option>
+            </select>
+          </div>
+        </div>
+      `;
+      grid.appendChild(card);
+    }
+  }
+
+  // ─── Param helpers ─────────────────────────────────
+  function updateParam(el, isPercent) {
+    const id = el.dataset.id;
+    const key = el.dataset.key;
+    const val = isPercent ? parseFloat(el.value) / 100 : parseFloat(el.value);
+    if (key === 'waveform' || key === 'env') params[id][key] = el.value;
+    else params[id][key] = val;
+  }
+
+  // ─── Preview a sound effect ────────────────────────
+  let previewTimeout = null;
+  function previewSound(id) {
+    const ctx = getAC();
+    const p = params[id];
+    const now = ctx.currentTime;
+    const card = document.getElementById('card-' + id);
+    const btn = card.querySelector('.play-btn');
+    btn.classList.add('previewing');
+    btn.textContent = '▶ Playing…';
+    clearTimeout(previewTimeout);
+    previewTimeout = setTimeout(() => {
+      document.querySelectorAll('.play-btn').forEach(b => { b.classList.remove('previewing'); b.textContent = '▶ Preview'; });
+    }, Math.max(p.dur * 1000 + 200, 800));
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = p.waveform;
+    osc.frequency.setValueAtTime(p.freq, now);
+
+    if (p.freq2 > 0 && p.env === 'ascend') {
+      osc.frequency.linearRampToValueAtTime(p.freq2, now + p.dur);
+    } else if (p.freq2 > 0 && p.env === 'descend') {
+      osc.frequency.linearRampToValueAtTime(p.freq2, now + p.dur);
+    }
+
+    gain.gain.setValueAtTime(0, now);
+    gain.gain.linearRampToValueAtTime(p.vol, now + 0.01);
+    if (p.dur > 0.08) {
+      gain.gain.setValueAtTime(p.vol, now + p.dur * 0.7);
+      gain.gain.linearRampToValueAtTime(0, now + p.dur);
+    } else {
+      gain.gain.linearRampToValueAtTime(0, now + p.dur);
+    }
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + p.dur + 0.05);
+  }
+
+  // ─── Collapse toggle ───────────────────────────────
+  function toggleCollapseAll() {
+    collapsed = !collapsed;
+    const btn = document.getElementById('collapseAllBtn');
+    const cards = document.querySelectorAll('.action-controls');
+    for (const c of cards) c.style.display = collapsed ? 'none' : '';
+    btn.textContent = collapsed ? '▸ Expand all' : '▸ Collapse all';
+  }
+
+  // ═══════════════════════════════════════════════════
+  //  MUSIC — Procedural Web Audio tracks
+  // ═══════════════════════════════════════════════════
+
+  const TRACKS = [
+    { id:'retro_runner',  name:'🏃 Retro Runner', desc:'Fast square-wave arpeggios over a driving bass line. Pentatonic — feels like a classic 8-bit platformer.' },
+    { id:'deep_space',    name:'🌌 Deep Space',   desc:'Slow ambient pads with filtered noise sweeps. Wide reverb. Good for menu screens.' },
+    { id:'lava_core',     name:'🌋 Lava Core',    desc:'Aggressive sawtooth bass with distorted leads and driving percussion. High energy for intense gameplay.' },
+    { id:'chill_orbit',   name:'🪐 Chill Orbit',  desc:'Mellow triangle-wave chords with gentle arpeggios. Relaxed exploration vibes.' },
+    { id:'8bit_quest',    name:'👾 8-bit Quest',  desc:'Classic square-wave melody with pulse bass and simple noise percussion. Nostalgic adventure feel.' },
+    { id:'cyber_drive',   name:'⚡ Cyber Drive',  desc:'Syncopated synth bass with filter sweeps and a steady pulse. Cyberpunk-ish chase music.' },
+    { id:'boss_encounter',name:'👹 Boss Encounter',desc:'Heavy descending bass line, dissonant harmonies, intense rhythm. Final-push tension.' },
+  ];
+
+  let musicPlaying = false;
+  let musicTimer = null;
+  let musicNodes = [];
+
+  function buildTrackSelect() {
+    const sel = document.getElementById('trackSelect');
+    sel.innerHTML = '';
+    for (const t of TRACKS) {
+      const opt = document.createElement('option');
+      opt.value = t.id;
+      opt.textContent = t.name;
+      sel.appendChild(opt);
+    }
+    onTrackChange();
+  }
+
+  function onTrackChange() {
+    const id = document.getElementById('trackSelect').value;
+    const t = TRACKS.find(x => x.id === id);
+    document.getElementById('trackInfo').textContent = t ? t.desc : '';
+    if (musicPlaying) { stopMusic(); }
+  }
+
+  function updateMusicDisplay() {
+    document.getElementById('musicTempoVal').textContent = document.getElementById('musicTempo').value;
+    document.getElementById('musicVolumeVal').textContent = document.getElementById('musicVolume').value;
+  }
+
+  function toggleMusic() {
+    if (musicPlaying) { stopMusic(); }
+    else { startMusic(); }
+  }
+
+  function stopMusic() {
+    musicPlaying = false;
+    clearInterval(musicTimer);
+    musicTimer = null;
+    for (const n of musicNodes) {
+      try { n.stop(); } catch(e) {}
+      try { n.disconnect(); } catch(e) {}
+    }
+    musicNodes = [];
+    const btn = document.getElementById('musicPlayBtn');
+    btn.textContent = '▶ Play';
+    btn.classList.remove('playing');
+  }
+
+  function startMusic() {
+    stopMusic();
+    const ctx = getAC();
+    const trackId = document.getElementById('trackSelect').value;
+    const tempo = parseInt(document.getElementById('musicTempo').value);
+    const volume = parseInt(document.getElementById('musicVolume').value) / 100;
+
+    musicPlaying = true;
+    const btn = document.getElementById('musicPlayBtn');
+    btn.textContent = '⏹ Stop';
+    btn.classList.add('playing');
+
+    // Each track is a generator that schedules notes into the future
+    const bpm = tempo;
+    const beatDur = 60 / bpm;
+    const startTime = ctx.currentTime + 0.1;
+
+    switch (trackId) {
+      case 'retro_runner':   genRetroRunner(ctx, startTime, beatDur, volume); break;
+      case 'deep_space':     genDeepSpace(ctx, startTime, beatDur, volume); break;
+      case 'lava_core':      genLavaCore(ctx, startTime, beatDur, volume); break;
+      case 'chill_orbit':    genChillOrbit(ctx, startTime, beatDur, volume); break;
+      case '8bit_quest':     gen8bitQuest(ctx, startTime, beatDur, volume); break;
+      case 'cyber_drive':    genCyberDrive(ctx, startTime, beatDur, volume); break;
+      case 'boss_encounter': genBossEncounter(ctx, startTime, beatDur, volume); break;
+    }
+
+    // Poll to keep context alive
+    musicTimer = setInterval(() => {
+      if (!musicPlaying) { stopMusic(); }
+    }, 1000);
+  }
+
+  // ─── Note helper ───────────────────────────────────
+  function scheduleNote(ctx, time, dur, freq, type, vol, dest) {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, time);
+    gain.gain.setValueAtTime(0, time);
+    gain.gain.linearRampToValueAtTime(vol, time + 0.005);
+    gain.gain.setValueAtTime(vol, time + dur * 0.7);
+    gain.gain.linearRampToValueAtTime(0, time + dur);
+    osc.connect(gain);
+    gain.connect(dest || ctx.destination);
+    osc.start(time);
+    osc.stop(time + dur + 0.02);
+    musicNodes.push(osc, gain);
+    return { osc, gain };
+  }
+
+  function scheduleNoise(ctx, time, dur, vol, dest) {
+    const bufferSize = ctx.sampleRate * dur;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(vol, time);
+    gain.gain.linearRampToValueAtTime(0, time + dur);
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'highpass';
+    filter.frequency.setValueAtTime(8000, time);
+    src.connect(gain);
+    gain.connect(filter);
+    filter.connect(dest || ctx.destination);
+    src.start(time);
+    src.stop(time + dur + 0.02);
+    musicNodes.push(src, gain, filter);
+    return { src, gain };
+  }
+
+  // ─── Scale helpers ─────────────────────────────────
+  const PENTATONIC = [261.6, 293.7, 329.6, 392.0, 440.0, 523.3, 587.3, 659.3, 784.0, 880.0, 1046.5];
+  const PENTATONIC_LOW = [130.8, 146.8, 164.8, 196.0, 220.0, 261.6];
+  const BLUES = [220, 233, 261.6, 277.2, 329.6, 349.2, 392, 440, 466, 523.3, 587.3, 622, 698.5, 784, 880];
+  const CHROMATIC_LOW = [130.8, 138.6, 146.8, 155.6, 164.8, 174.6, 185.0, 196.0, 207.7, 220.0, 233.1, 246.9, 261.6];
+  const TRIAD = [261.6, 329.6, 392.0, 523.3, 659.3, 784.0];
+  const MAJOR = [261.6, 293.7, 329.6, 349.2, 392.0, 440.0, 493.9, 523.3, 587.3, 659.3, 698.5, 784.0];
+
+  function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // ─── Track Generators ──────────────────────────────
+
+  function genRetroRunner(ctx, start, beat, vol) {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(vol * 0.5, start);
+    master.connect(ctx.destination);
+    musicNodes.push(master);
+
+    // Arpeggio — fast square wave
+    for (let bar = 0; bar < 8; bar++) {
+      const barTime = start + bar * 4 * beat;
+      const notes = [PENTATONIC[3], PENTATONIC[5], PENTATONIC[4], PENTATONIC[3],
+                     PENTATONIC[5], PENTATONIC[7], PENTATONIC[5], PENTATONIC[4]];
+      for (let i = 0; i < notes.length; i++) {
+        const t = barTime + i * beat * 0.5;
+        scheduleNote(ctx, t, beat * 0.4, notes[i], 'square', vol * 0.4, master);
+      }
+    }
+    // Bass line — triangle
+    for (let bar = 0; bar < 8; bar++) {
+      const barTime = start + bar * 4 * beat;
+      const bassNotes = [PENTATONIC_LOW[2], PENTATONIC_LOW[2], PENTATONIC_LOW[3], PENTATONIC_LOW[3],
+                         PENTATONIC_LOW[4], PENTATONIC_LOW[4], PENTATONIC_LOW[5], PENTATONIC_LOW[5]];
+      for (let i = 0; i < bassNotes.length; i++) {
+        const t = barTime + i * beat * 0.5;
+        scheduleNote(ctx, t, beat * 0.45, bassNotes[i], 'triangle', vol * 0.35, master);
+      }
+    }
+    // Percussion — noise clicks
+    for (let bar = 0; bar < 8; bar++) {
+      const barTime = start + bar * 4 * beat;
+      for (let i = 0; i < 8; i++) {
+        const t = barTime + i * beat * 0.5;
+        if (i % 2 === 1) scheduleNoise(ctx, t, beat * 0.08, vol * 0.15, master);
+        if (i % 4 === 0) scheduleNoise(ctx, t, beat * 0.12, vol * 0.25, master);
+      }
+    }
+  }
+
+  function genDeepSpace(ctx, start, beat, vol) {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(vol * 0.4, start);
+    master.connect(ctx.destination);
+    musicNodes.push(master);
+
+    // Drone pad — filtered sawtooth
+    const drone = ctx.createOscillator();
+    const droneGain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+    drone.type = 'sawtooth';
+    drone.frequency.setValueAtTime(65.4, start);
+    droneGain.gain.setValueAtTime(vol * 0.3, start);
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(300, start);
+    filter.frequency.linearRampToValueAtTime(800, start + 16);
+    drone.connect(droneGain);
+    droneGain.connect(filter);
+    filter.connect(master);
+    drone.start(start);
+    drone.stop(start + 16);
+    musicNodes.push(drone, droneGain, filter);
+
+    // Slow shifting pad notes — triangle
+    const padFreqs = [220, 261.6, 329.6, 392, 329.6, 261.6, 220, 174.6];
+    for (let i = 0; i < padFreqs.length; i++) {
+      const t = start + i * 2 * beat;
+      scheduleNote(ctx, t, beat * 1.8, padFreqs[i], 'triangle', vol * 0.25, master);
+    }
+
+    // Occasional filtered noise swells
+    for (let i = 0; i < 4; i++) {
+      const t = start + i * 4 * beat;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0, t);
+      noiseGain.gain.linearRampToValueAtTime(vol * 0.12, t + beat * 1.5);
+      noiseGain.gain.linearRampToValueAtTime(0, t + beat * 3);
+      const nf = ctx.createBiquadFilter();
+      nf.type = 'lowpass';
+      nf.frequency.setValueAtTime(200, t);
+      nf.frequency.linearRampToValueAtTime(3000, t + beat * 1.5);
+      nf.frequency.linearRampToValueAtTime(500, t + beat * 3);
+      const bufferSize = ctx.sampleRate * 3;
+      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let j = 0; j < bufferSize; j++) data[j] = Math.random() * 2 - 1;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      src.connect(nf);
+      nf.connect(noiseGain);
+      noiseGain.connect(master);
+      src.start(t);
+      src.stop(t + beat * 3);
+      musicNodes.push(src, nf, noiseGain);
+    }
+  }
+
+  function genLavaCore(ctx, start, beat, vol) {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(vol * 0.5, start);
+    master.connect(ctx.destination);
+    musicNodes.push(master);
+
+    // Distorted bass — sawtooth with clipping via wave shaping
+    for (let bar = 0; bar < 8; bar++) {
+      const barTime = start + bar * 4 * beat;
+      const bassPats = [PENTATONIC_LOW[0], PENTATONIC_LOW[0], PENTATONIC_LOW[2], PENTATONIC_LOW[2],
+                        PENTATONIC_LOW[3], PENTATONIC_LOW[3], PENTATONIC_LOW[4], PENTATONIC_LOW[4]];
+      for (let i = 0; i < bassPats.length; i++) {
+        const t = barTime + i * beat * 0.5;
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(bassPats[i] * 0.5, t);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol * 0.5, t + beat * 0.05);
+        g.gain.setValueAtTime(vol * 0.5, t + beat * 0.3);
+        g.gain.linearRampToValueAtTime(0, t + beat * 0.45);
+        osc.connect(g);
+        g.connect(master);
+        osc.start(t);
+        osc.stop(t + beat * 0.5);
+        musicNodes.push(osc, g);
+      }
+    }
+
+    // Aggressive lead — sawtooth, high notes
+    for (let bar = 0; bar < 8; bar++) {
+      const barTime = start + bar * 4 * beat;
+      for (let i = 0; i < 4; i++) {
+        const t = barTime + i * beat;
+        const freq = BLUES[Math.floor(Math.random() * (BLUES.length - 2)) + 2];
+        const d = beat * (0.25 + Math.random() * 0.5);
+        scheduleNote(ctx, t, d, freq, 'sawtooth', vol * 0.25, master);
+      }
+    }
+
+    // Percussion — heavy hits
+    for (let bar = 0; bar < 8; bar++) {
+      const barTime = start + bar * 4 * beat;
+      for (let i = 0; i < 4; i++) {
+        const t = barTime + i * beat;
+        if (i % 2 === 0) scheduleNoise(ctx, t, beat * 0.15, vol * 0.3, master);
+        scheduleNoise(ctx, t + beat * 0.5, beat * 0.06, vol * 0.1, master);
+      }
+    }
+  }
+
+  function genChillOrbit(ctx, start, beat, vol) {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(vol * 0.4, start);
+    master.connect(ctx.destination);
+    musicNodes.push(master);
+
+    // Slow chord pads — sine
+    const chordProg = [
+      [261.6, 329.6, 392.0],
+      [293.7, 349.2, 440.0],
+      [329.6, 392.0, 493.9],
+      [261.6, 329.6, 392.0],
+      [220.0, 277.2, 329.6],
+      [261.6, 329.6, 392.0],
+      [196.0, 246.9, 293.7],
+      [261.6, 329.6, 392.0],
+    ];
+    for (let ci = 0; ci < chordProg.length; ci++) {
+      const barTime = start + ci * 2 * beat;
+      for (const f of chordProg[ci]) {
+        scheduleNote(ctx, barTime, beat * 1.8, f, 'sine', vol * 0.2, master);
+      }
+    }
+
+    // Gentle arpeggio — triangle
+    const arpNotes = [];
+    for (let ci = 0; ci < chordProg.length; ci++) {
+      const chord = chordProg[ci];
+      for (let n = 0; n < 4; n++) {
+        arpNotes.push({ freq: chord[n % chord.length], time: start + ci * 2 * beat + n * beat * 0.5 });
+      }
+    }
+    for (const an of arpNotes) {
+      scheduleNote(ctx, an.time, beat * 0.4, an.freq * 2, 'triangle', vol * 0.15, master);
+    }
+
+    // Soft noise shaker
+    for (let i = 0; i < 32; i++) {
+      const t = start + i * beat * 0.5;
+      scheduleNoise(ctx, t, beat * 0.04, vol * 0.04, master);
+    }
+  }
+
+  function gen8bitQuest(ctx, start, beat, vol) {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(vol * 0.5, start);
+    master.connect(ctx.destination);
+    musicNodes.push(master);
+
+    // Melody — square wave
+    const melody = [392, 440, 523.3, 587.3, 523.3, 440, 392, 349.2,
+                    392, 440, 523.3, 659.3, 587.3, 523.3, 440, 392];
+    for (let i = 0; i < melody.length; i++) {
+      const t = start + i * beat * 0.5;
+      scheduleNote(ctx, t, beat * 0.4, melody[i], 'square', vol * 0.35, master);
+    }
+    // Repeat with variation
+    for (let i = 0; i < melody.length; i++) {
+      const t = start + 8 * beat + i * beat * 0.5;
+      const f = melody[i] * (i % 3 === 0 ? 1.5 : 1);
+      scheduleNote(ctx, t, beat * 0.4, f, 'square', vol * 0.35, master);
+    }
+
+    // Pulse bass — square, low
+    for (let bar = 0; bar < 16; bar++) {
+      const barTime = start + bar * 2 * beat;
+      const bassF = PENTATONIC_LOW[bar % PENTATONIC_LOW.length];
+      scheduleNote(ctx, barTime, beat * 0.9, bassF, 'square', vol * 0.3, master);
+    }
+
+    // Noise percussion
+    for (let bar = 0; bar < 16; bar++) {
+      const barTime = start + bar * 2 * beat;
+      scheduleNoise(ctx, barTime, beat * 0.1, vol * 0.15, master);
+      scheduleNoise(ctx, barTime + beat, beat * 0.05, vol * 0.08, master);
+    }
+  }
+
+  function genCyberDrive(ctx, start, beat, vol) {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(vol * 0.45, start);
+    master.connect(ctx.destination);
+    musicNodes.push(master);
+
+    // Syncopated bass — sawtooth with filter sweep
+    for (let bar = 0; bar < 8; bar++) {
+      const barTime = start + bar * 4 * beat;
+      const pat = [PENTATONIC_LOW[1], PENTATONIC_LOW[3], PENTATONIC_LOW[1], PENTATONIC_LOW[4],
+                   PENTATONIC_LOW[2], PENTATONIC_LOW[5], PENTATONIC_LOW[2], PENTATONIC_LOW[3]];
+      for (let i = 0; i < pat.length; i++) {
+        if (i === 3 || i === 7) continue; // syncopation
+        const t = barTime + i * beat * 0.5;
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        const f = ctx.createBiquadFilter();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(pat[i], t);
+        f.type = 'lowpass';
+        f.frequency.setValueAtTime(400 + Math.random() * 600, t);
+        g.gain.setValueAtTime(0, t);
+        g.gain.linearRampToValueAtTime(vol * 0.4, t + beat * 0.03);
+        g.gain.setValueAtTime(vol * 0.4, t + beat * 0.3);
+        g.gain.linearRampToValueAtTime(0, t + beat * 0.45);
+        osc.connect(g);
+        g.connect(f);
+        f.connect(master);
+        osc.start(t);
+        osc.stop(t + beat * 0.5);
+        musicNodes.push(osc, g, f);
+      }
+    }
+
+    // High pulse — square, fast repeating
+    for (let i = 0; i < 64; i++) {
+      const t = start + i * beat * 0.25;
+      if (i % 2 === 0) {
+        scheduleNote(ctx, t, beat * 0.2, 880, 'square', vol * 0.1, master);
+      }
+    }
+
+    // Noise hats
+    for (let i = 0; i < 64; i++) {
+      const t = start + i * beat * 0.25;
+      if (i % 4 === 0) scheduleNoise(ctx, t, beat * 0.05, vol * 0.08, master);
+      if (i % 8 === 7) scheduleNoise(ctx, t, beat * 0.1, vol * 0.18, master);
+    }
+  }
+
+  function genBossEncounter(ctx, start, beat, vol) {
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(vol * 0.5, start);
+    master.connect(ctx.destination);
+    musicNodes.push(master);
+
+    // Heavy descending bass line — square wave low
+    const bassSeq = [196, 196, 174.6, 174.6, 164.8, 164.8, 146.8, 146.8,
+                     130.8, 130.8, 146.8, 146.8, 164.8, 164.8, 174.6, 174.6];
+    for (let i = 0; i < bassSeq.length; i++) {
+      const t = start + i * beat * 0.5;
+      scheduleNote(ctx, t, beat * 0.45, bassSeq[i], 'square', vol * 0.5, master);
+    }
+
+    // Dissonant stabs — sawtooth, short, with reverb-like repeats
+    const stabPattern = [261.6, 311.1, 261.6, 369.9, 311.1, 261.6, 207.7, 261.6];
+    for (let i = 0; i < stabPattern.length; i++) {
+      const t = start + i * beat;
+      const osc = ctx.createOscillator();
+      const g = ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(stabPattern[i], t);
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(vol * 0.3, t + beat * 0.02);
+      g.gain.linearRampToValueAtTime(0, t + beat * 0.2);
+      osc.connect(g);
+      g.connect(master);
+      osc.start(t);
+      osc.stop(t + beat * 0.25);
+      musicNodes.push(osc, g);
+      // Echo
+      const echoG = ctx.createGain();
+      echoG.gain.setValueAtTime(vol * 0.08, t + beat * 0.5);
+      echoG.gain.linearRampToValueAtTime(0, t + beat * 1.5);
+      // Can't reuse osc, so just use the echo as an additional gain on same signal? Skip for simplicity
+    }
+
+    // Intense percussion
+    for (let bar = 0; bar < 4; bar++) {
+      const barTime = start + bar * 8 * beat;
+      for (let i = 0; i < 16; i++) {
+        const t = barTime + i * beat * 0.5;
+        if (i % 2 === 0) scheduleNoise(ctx, t, beat * 0.15, vol * 0.3, master);
+        if (i % 4 === 1 || i % 4 === 3) scheduleNoise(ctx, t, beat * 0.04, vol * 0.06, master);
+        if (i === 7 || i === 15) scheduleNoise(ctx, t, beat * 0.2, vol * 0.4, master); // accent
+      }
+    }
+
+    // Build-up riser at the end
+    const riser = ctx.createOscillator();
+    const rGain = ctx.createGain();
+    riser.type = 'sawtooth';
+    riser.frequency.setValueAtTime(100, start + 12 * beat);
+    riser.frequency.exponentialRampToValueAtTime(2000, start + 15.8 * beat);
+    rGain.gain.setValueAtTime(0, start + 12 * beat);
+    rGain.gain.linearRampToValueAtTime(vol * 0.2, start + 15.5 * beat);
+    rGain.gain.linearRampToValueAtTime(0, start + 16 * beat);
+    riser.connect(rGain);
+    rGain.connect(master);
+    riser.start(start + 12 * beat);
+    riser.stop(start + 16 * beat);
+    musicNodes.push(riser, rGain);
+  }
+
+  // ─── Push config to server ─────────────────────────
+  async function pushToServer() {
+    const btn = document.getElementById('pushBtn');
+    btn.disabled = true;
+    btn.textContent = '⏳ Pushing…';
+
+    const soundCfg = {};
+    for (const a of ACTIONS) {
+      const p = params[a.id];
+      soundCfg[`fx_${a.id}_waveform`] = p.waveform;
+      soundCfg[`fx_${a.id}_freq`] = p.freq;
+      soundCfg[`fx_${a.id}_freq2`] = p.freq2;
+      soundCfg[`fx_${a.id}_dur`] = p.dur;
+      soundCfg[`fx_${a.id}_vol`] = p.vol;
+      soundCfg[`fx_${a.id}_env`] = p.env;
+    }
+    soundCfg.music_track = document.getElementById('trackSelect').value;
+    soundCfg.music_tempo = parseInt(document.getElementById('musicTempo').value);
+    soundCfg.music_volume = parseInt(document.getElementById('musicVolume').value) / 100;
+
+    try {
+      const res = await fetch('/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(soundCfg),
+      });
+      const data = await res.json();
+      document.getElementById('status').textContent = 'Pushed at ' + new Date().toLocaleTimeString() + ' — ' + Object.keys(soundCfg).length + ' params sent.';
+    } catch(e) {
+      document.getElementById('status').textContent = 'Error: ' + e.message;
+    }
+    btn.disabled = false;
+    btn.textContent = '📡 Push to game';
+  }
+
+  // ─── Init ──────────────────────────────────────────
+  buildUI();
+  buildTrackSelect();
+  updateMusicDisplay();
+
+  // Load initial config from server
+  (async () => {
+    try {
+      const res = await fetch('/config');
+      const cfg = await res.json();
+      for (const a of ACTIONS) {
+        const p = params[a.id];
+        if (cfg[`fx_${a.id}_waveform`] !== undefined) p.waveform = cfg[`fx_${a.id}_waveform`];
+        if (cfg[`fx_${a.id}_freq`] !== undefined) p.freq = cfg[`fx_${a.id}_freq`];
+        if (cfg[`fx_${a.id}_freq2`] !== undefined) p.freq2 = cfg[`fx_${a.id}_freq2`];
+        if (cfg[`fx_${a.id}_dur`] !== undefined) p.dur = cfg[`fx_${a.id}_dur`];
+        if (cfg[`fx_${a.id}_vol`] !== undefined) p.vol = cfg[`fx_${a.id}_vol`];
+        if (cfg[`fx_${a.id}_env`] !== undefined) p.env = cfg[`fx_${a.id}_env`];
+      }
+      if (cfg.music_track !== undefined) document.getElementById('trackSelect').value = cfg.music_track;
+      if (cfg.music_tempo !== undefined) document.getElementById('musicTempo').value = cfg.music_tempo;
+      if (cfg.music_volume !== undefined) document.getElementById('musicVolume').value = Math.round(cfg.music_volume * 100);
+      updateMusicDisplay();
+      onTrackChange();
+      // Rebuild UI with loaded values
+      buildUI();
+      document.getElementById('status').textContent = 'Loaded from server.';
+    } catch(e) {
+      document.getElementById('status').textContent = 'Could not load from server (start node server.js first).';
+    }
+  })();
+  </script>
+</body>
+</html>

@@ -8,13 +8,16 @@ const config = {
   lavaSpeed: 0.5,
   lavaGravity: 0.03,
   lavaSpawnRate: 80,
-  lavaSize: 10,
+  lavaSizeMin: 10,
+  lavaSizeMax: 50,
+  lavaHarmPercent: 50,
   shipSpeed: 4,
   bulletSpeed: 8,
   shootDelay: 200,
   shipSize: 24,
   hoseCount: 2,
-  restartDelay: 3,
+  restartDelay: 5,
+  uiLayout: 'bottom',
 };
 
 app.get('/config', (req, res) => res.json(config));
@@ -22,6 +25,19 @@ app.get('/config', (req, res) => res.json(config));
 app.post('/config', (req, res) => {
   Object.assign(config, req.body);
   res.json(config);
+});
+
+let resetPending = false;
+
+app.post('/reset', (req, res) => {
+  resetPending = true;
+  res.json({ ok: true });
+});
+
+app.get('/reset-check', (req, res) => {
+  const val = resetPending;
+  resetPending = false;
+  res.json({ reset: val });
 });
 
 const PORT = process.env.PORT || 8080;
