@@ -1,7 +1,90 @@
-# Pi + Groq (Qwen 3.6 27B) setup — fast cheap coding agent with rate-limit fallback
+# Pi model setups — cheap/fast coding-agent configs (Groq + Makora)
 
-How to run the [pi coding agent](https://github.com/earendil-works/pi) on Groq's
-`qwen/qwen3.6-27b` (very fast, very cheap, but tight per-minute rate limits) with
+Configs for running the [pi coding agent](https://github.com/earendil-works/pi)
+on cheap, fast hosted models. Three daily-drivable setups live in
+`~/.pi/agent/models.json`, all selectable via `/model`:
+
+## The three setups at a glance
+
+Per model **and reasoning level** — intelligence, verbosity, and what that
+means in wall-clock and dollars. "Index tokens" = output tokens Artificial
+Analysis measured (or we estimate) to run their full Intelligence Index;
+"wall-clock" = those tokens at our measured decode TPS; "cost" = AA's
+measured cost to run the index at that endpoint's prices.
+
+| Setup + thinking level | Intelligence (AA) | Index tokens | TPS (ours) | Wall-clock, full AA eval | Cost, full AA eval |
+|---|---|---|---|---|---|
+| Groq Qwen 3.6 27B — **off** | 30 | 25M | ~490 | **~14 h** | $356 |
+| Groq Qwen 3.6 27B — **thinking** | 37 | 140M | ~490 | ~79 h | $668 |
+| Flash (Makora) — **off** | 29 | not published (~10–25M est.) | 272 | ~10–26 h est. | ~$15–35 est. |
+| Flash (Makora) — **high** | 37 | not published (est. ~60–90M; our n=1 hard task: 36k tokens, 92% thinking) | 272 | ~60–90 h est. | ~$40–60 est. |
+| Flash (Makora) — **max** | 40 | 230M | 272 | ~235 h | ~$62 (at Makora prices; $74 first-party) |
+| Kimi K2.7 Code (Makora) — **thinking** | 42 | 100M | 207 | ~134 h | ~$445 (at Makora prices) |
+
+Setup-level properties:
+
+| | **Groq Qwen 3.6 27B** | **DeepSeek V4 Flash (Makora)** | **Kimi K2.7 Code (Makora)** |
+|---|---|---|---|
+| Price per 1M in / out | $0.60 / $3.00 | $0.096 / $0.237 | $0.816 / $3.383 |
+| Cached input per 1M | no cache discount on Groq | $0.0723 (25% off) | $0.1615 (80% off) |
+| Thinking levels (Shift+Tab) | off, high | off, high, max | off, high |
+| Rate limits | tight (250k TPM, 32k OTPM/min) — needs the fallback extension | none hit yet (pay-as-you-go) | none hit yet (pay-as-you-go) |
+| Prompt caching | none — replay stripping essential | priced (25% off) but `cached_tokens` always 0 in our tests so far | priced (80% off) — makes preserved reasoning cheap to replay |
+| Reasoning replay | stripped by extension | preserved (V4 requires it in tool-call turns) | preserved (Kimi is trained for it) |
+| Sweet spot | fastest raw decode for routine work | ~8× cheapest; max mode = budget smart model | smartest; best wall-clock among smart models (least verbose reasoner) |
+
+Notes on the per-level rows:
+- Qwen thinking-mode numbers are AA's (intelligence 37, 140M tokens, $668) —
+  thinking costs 5.6× the tokens and ~2× the money of Qwen-off for +7 points.
+- Flash **high** verbosity is unpublished; the 60–90M estimate scales AA's
+  230M max-effort figure by our measured high:max ratio on one hard prompt
+  (36.4k vs ≥100k truncated — so ≥2.7×, likely more). Treat as rough.
+- Flash **max** is unbounded thinking: our hard-prompt test burned 100k
+  tokens without finishing its reasoning. Budget wall-clock accordingly.
+- Same-intelligence-tier comparison (37): Qwen-thinking ~79 h/$668 vs
+  Flash-high ~60–90 h/~$50 — similar wall-clock, ~13× cheaper on Flash.
+
+Rule of thumb: **Flash-off for routine work** (Qwen-level intelligence at a
+tenth of the cost), **Kimi for hard problems** (intelligence 42, and the best
+wall-clock per task among the smart models), **Flash-max when the hard problem
+can wait** (intelligence 40 at ~$0.13 blended, but its thinking is very
+verbose — ~2.3× Kimi's tokens per task). Groq Qwen remains the pure-speed
+option when per-request latency is king.
+
+## Switching between the three modes
+
+`~/.pi/agent/settings.json` wires the three working modes into a **Ctrl+P
+cycle** (each entry carries its own thinking level, so cycling models also
+sets the right effort — no separate Shift+Tab needed):
+
+```json
+{
+  "defaultProvider": "makora",
+  "defaultModel": "deepseek-ai/DeepSeek-V4-Flash",
+  "defaultThinkingLevel": "high",
+  "enabledModels": [
+    "makora/deepseek-ai/DeepSeek-V4-Flash:high",
+    "makora/moonshotai/Kimi-K2.7-Code:high",
+    "groq/qwen/qwen3.6-27b:off"
+  ]
+}
+```
+
+- **Default on startup: Flash high** (the ~13×-cheaper equal-intelligence
+  replacement for Qwen-thinking).
+- **Ctrl+P** → Kimi thinking (extra oomph, still fast per task).
+- **Ctrl+P again** → Groq Qwen no-thinking (max TPS for trivial edits).
+- **Shift+Tab** still escalates within a model (e.g. Flash high → max for a
+  hard problem — but note max is unbounded thinking; see table notes).
+- `/model` and `/scoped-models` remain available for anything outside the
+  cycle. Manual switches stand down the groq-fallback automation as before.
+
+The rest of this doc: first the original Groq setup (whose rate-limit
+machinery motivated most of the extensions), then the Makora additions.
+
+# Setup 1: Pi + Groq (Qwen 3.6 27B) — with rate-limit fallback
+
+Runs Groq's `qwen/qwen3.6-27b` (very fast, but tight per-minute rate limits) with
 automatic fallback to `z-ai/glm-5.2:nitro` on OpenRouter when Groq throttles.
 
 Everything lives in `~/.pi/agent/` (global, not per-repo), so in a fresh
@@ -51,6 +134,52 @@ Discovered the hard way, in order:
 ```json
 {
   "providers": {
+    "makora": {
+      "baseUrl": "https://inference.makora.com/v1",
+      "api": "openai-completions",
+      "apiKey": "$MAKORA_API_KEY",
+      "compat": {
+        "supportsDeveloperRole": false
+      },
+      "models": [
+        {
+          "id": "deepseek-ai/DeepSeek-V4-Flash",
+          "name": "DeepSeek V4 Flash (Makora)",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "high",
+            "xhigh": null,
+            "max": "max"
+          },
+          "input": ["text"],
+          "contextWindow": 1000000,
+          "maxTokens": 131072,
+          "cost": { "input": 0.096, "output": 0.237, "cacheRead": 0.0723, "cacheWrite": 0.096 }
+        },
+        {
+          "id": "moonshotai/Kimi-K2.7-Code",
+          "name": "Kimi K2.7 Code (Makora)",
+          "reasoning": true,
+          "thinkingLevelMap": {
+            "off": "none",
+            "minimal": null,
+            "low": null,
+            "medium": null,
+            "high": "enabled",
+            "xhigh": null,
+            "max": null
+          },
+          "input": ["text"],
+          "contextWindow": 262144,
+          "maxTokens": 32000,
+          "cost": { "input": 0.8155, "output": 3.383, "cacheRead": 0.1615, "cacheWrite": 0.8155 }
+        }
+      ]
+    },
     "openrouter": {
       "models": [
         {
@@ -97,10 +226,11 @@ Discovered the hard way, in order:
 Notes:
 - `groq` and `openrouter` are built-in pi providers — these entries add custom
   models to them (baseUrl/API type inherited). API keys: `/login` in pi for
-  each provider (stored in `~/.pi/agent/auth.json`).
+  each provider (stored in `~/.pi/agent/auth.json`). `makora` is a fully
+  custom provider — its key comes from `$MAKORA_API_KEY`, not `/login`.
 - `thinkingLevelMap`: `null` = level unsupported (pi won't offer it), string =
-  what to send as `reasoning_effort`. Net effect: two thinking settings, off
-  and high.
+  what to send as `reasoning_effort`. Net effect: off/high on Qwen and Kimi,
+  off/high/max on Flash.
 - The `:nitro` suffix on the OpenRouter model = "sort hosts by throughput".
   `reasoning: false` because we want the fallback non-thinking.
 - `maxTokens: 8000` on the Groq model must match `OTPM_RESERVATION` in the
@@ -135,7 +265,10 @@ malformed-edit retry loops; pi's validation errors remain the backstop.
 
 ### 3. `~/.pi/agent/extensions/strip-reasoning-replay.ts`
 
-Stops pi from re-sending accumulated reasoning as input on every request.
+Stops pi from re-sending accumulated reasoning as input on every request —
+for models where dropping it is safe (Qwen-on-Groq); Kimi and DeepSeek V4 are
+exempted because they are trained/required to reason over preserved thinking
+(see the header comment).
 Mechanism: pi's openai-completions serializer only replays thinking blocks
 that carry a `thinkingSignature`; this hooks `message_end` and strips the
 signature when each assistant message is finalized. Reasoning still streams
@@ -156,12 +289,24 @@ how most big-model harnesses treat prior-turn thinking).
  * This extension removes the signature when each assistant message is
  * finalized: the reasoning still streams and displays live in the TUI, but
  * past turns' reasoning silently drops out of future requests.
+ *
+ * Exceptions — models trained to reason over preserved thinking:
+ * - Kimi K2.7 Code: Moonshot's API forces preserve_thinking on.
+ * - DeepSeek V4 (Flash/Pro): in tool-calling conversations the docs REQUIRE
+ *   reasoning_content to be passed back (first-party API 400s without it);
+ *   V4 preserves reasoning across turns whenever tool calls are present.
+ *   https://api-docs.deepseek.com/guides/thinking_mode/
+ * Stripping would degrade (or break) their multi-turn agentic quality, so
+ * their messages are left untouched. Qwen-on-Groq etc. are still stripped.
  */
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+
+const PRESERVE_THINKING = /kimi|deepseek/i; // matched against the message's model id
 
 export default function (pi: ExtensionAPI) {
   pi.on("message_end", async (event) => {
     if (event.message.role !== "assistant") return;
+    if (PRESERVE_THINKING.test((event.message as any).model ?? "")) return;
     const content = event.message.content;
     if (!Array.isArray(content)) return;
 
@@ -431,15 +576,68 @@ export default function (pi: ExtensionAPI) {
 }
 ```
 
+# Setups 2 & 3: Makora — DeepSeek V4 Flash + Kimi K2.7 Code (added 2026-07-12)
+
+`models.json` also registers **Makora** (`https://inference.makora.com/v1`,
+OpenAI-completions, auth via `$MAKORA_API_KEY` exported in `~/.bashrc`) with
+two models, both speed-verified against our own key:
+
+- **DeepSeek V4 Flash** — measured 272 tok/s decode, $0.096/$0.237 per 1M
+  (cached input $0.0723 — only a 25% discount on Makora, nothing like the 98%
+  DeepSeek first-party offers, but uncached input is already near-free).
+  Reasoning levels wired as off→`none`, high→`high`, max→`max`
+  (Shift+Tab cycles all three). 1M context, `maxTokens: 131072` (thinking on
+  max effort can run very long — vLLM's recipe wants ≥384k headroom, and a
+  truncated thought wastes the whole request; 32k proved too tight).
+  Default to **high** effort: DeepSeek's own docs default to it, and max buys
+  +3 AA-index points for ~2.6× the thinking tokens.
+- **Kimi K2.7 Code** — measured 207 tok/s, $0.8155/$3.383 per 1M
+  (cached input $0.1615 — an 80% discount, so replayed context including its
+  preserved reasoning is cheap once caching kicks in). Makora exposes
+  only `enabled` as a reasoning level (plus `none` accepted empirically), so
+  the map is off→`none`, high→`enabled`.
+
+Notes:
+- `strip-reasoning-replay` now **skips Kimi and DeepSeek models** (regex on
+  the message's `model` id). Kimi: Moonshot trains K2.7 over preserved
+  thinking and forces `preserve_thinking` on. DeepSeek V4: the R1/V3-era
+  "don't send reasoning back" rule is REVERSED for tool-calling conversations
+  — reasoning_content must be passed back (first-party API 400s without it;
+  https://api-docs.deepseek.com/guides/thinking_mode/). Qwen-on-Groq is
+  still stripped.
+- DeepSeek V4 gotchas (from vLLM/community issue trackers, 2026-07): don't
+  set temperature (ignored in thinking mode; V4 wants 1.0 anyway); avoid tool
+  parameters literally named `arguments` or `input` (vLLM's deepseek_v4 tool
+  parser mangles them); don't rely on json_mode/structured outputs while
+  thinking is on (known vLLM bug). Long-context quality: solid to ~256k
+  (MRCR >0.82), degrades beyond — `/compact` around 200–256k, not at 1M.
+- The `groq-fallback` extension is inert on Makora models (it checks the
+  active model is the Groq primary before acting) — no changes needed.
+- Makora rate limits: free tier is ~1 request/window; pay-as-you-go lifts it.
+- Makora publishes cached-input pricing (Flash $0.0723, Kimi $0.1615 per 1M),
+  but in our tests `prompt_tokens_details.cached_tokens` has only ever been 0
+  — cache *hits* are unverified in practice. Keep prompts prefix-stable and
+  watch that field in real sessions; until hits appear, budget at uncached
+  rates. No cache discount at all on Groq.
+- Makora's marketing TPS numbers are batch throughput, not per-request: their
+  Qwen endpoints measured 35–39 tok/s single-stream despite a "609 TPS" claim.
+  The two models above are their genuinely fast endpoints (AA-verified too).
+
 ## Recreating from scratch
 
 1. Install pi, run it once, then `/login` for **groq** and **openrouter**.
-2. Create the four files above under `~/.pi/agent/`
+2. Export `MAKORA_API_KEY` in `~/.bashrc` (Makora auth is via env var in
+   models.json, not `/login`).
+3. Create the four files above under `~/.pi/agent/`
    (`models.json`, `AGENTS.md`, `extensions/strip-reasoning-replay.ts`,
-   `extensions/groq-fallback.ts`).
-3. Start a new pi session; select **Qwen 3.6 27B (Groq)** via `/model`.
-4. Set thinking with Shift+Tab: **off** for routine agent work (faster, no
-   truncation, lighter OTPM), **high** for hard problems.
+   `extensions/groq-fallback.ts`), plus the `defaultModel`/`enabledModels`
+   keys in `~/.pi/agent/settings.json` (see "Switching between the three
+   modes" at the top).
+4. Start a new pi session — it opens on Flash-high; **Ctrl+P** cycles
+   Flash-high → Kimi-thinking → Qwen-off.
+5. Shift+Tab escalates within a model when needed (e.g. Flash high → max for
+   a hard problem; on Groq keep **off** for routine work — faster, no
+   truncation, lighter OTPM).
 
 ## Daily-driving notes
 
