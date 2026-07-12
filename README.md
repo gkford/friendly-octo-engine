@@ -9,21 +9,27 @@ A browser-based vertical shooter built as a father-son project. Lava blobs rain 
 
 The game polls the server for config every second, so slider changes on the laptop show up on the iPad within ~1 second without a reload.
 
-## Architecture
+## Layout
 
-Three files, deliberately simple:
+Two folders, deliberately separate:
+
+- **`game/`** — everything the game *is*. Work on the game? Stay in here.
+- **`infra/`** — everything that gets it onto the iPad (tunnel script, agent
+  setup, troubleshooting). The game never depends on it.
+
+## Architecture (`game/`)
 
 | File | Purpose |
 |---|---|
-| `index.html` | The entire game — canvas rendering, game loop, gamepad input, procedural music (Web Audio), all in one inline `<script>` |
-| `dev.html` | Dev dashboard — sliders/selects that GET and POST `/config` |
-| `sound.html` | Sound lab — design sound effects and preview procedural music tracks |
-| `server.js` | Express server — serves static files, holds in-memory `config`, exposes `GET/POST /config` |
+| `game/index.html` | The entire game — canvas rendering, game loop, gamepad input, all in one inline `<script>` |
+| `game/dev.html` | Dev dashboard — sliders/selects that GET and POST `/config` |
+| `game/sound.html` | Sound lab — design sound effects and preview procedural music tracks |
+| `game/server.js` | Express server — serves the `game/` folder, holds in-memory `config`, exposes `GET/POST /config` |
 
 Run it with:
 
 ```bash
-node server.js
+node game/server.js
 # Game:      http://localhost:8080
 # Dev panel: http://localhost:8080/dev.html
 # Sound lab: http://localhost:8080/sound.html
@@ -31,12 +37,12 @@ node server.js
 
 No build step, no persistence — config lives in server memory and resets on restart.
 
-## Getting it on the iPad
+## Getting it on the iPad (`infra/`)
 
 ```bash
-./start.sh
+./infra/start.sh
 ```
 
-That starts the server, opens a Cloudflare tunnel, verifies it end-to-end, and regenerates `game-starter-QR.png` **and `LINKS.md`** — the latter lists every current URL (game, dev panel, sound lab, local equivalents). Scan the QR with the iPad camera, or grab links from `LINKS.md`. **The URL/QR changes every start — always scan the fresh one.** One-time iPad setup: allow `trycloudflare.com` in Screen Time.
+That starts the server, opens a Cloudflare tunnel, verifies it end-to-end, and regenerates `game-starter-QR.png` **and `LINKS.md`** in the repo root — the latter lists every current URL (game, dev panel, sound lab, local equivalents). Scan the QR with the iPad camera, or grab links from `LINKS.md`. **The URL/QR changes every start — always scan the fresh one.** One-time iPad setup: allow `trycloudflare.com` in Screen Time.
 
-→ Problems, or why we don't use GitHub's own port forwarding: see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+→ Problems, or why we don't use GitHub's own port forwarding: see [infra/TROUBLESHOOTING.md](./infra/TROUBLESHOOTING.md)
