@@ -579,8 +579,9 @@ export default function (pi: ExtensionAPI) {
 # Setups 2 & 3: Makora — DeepSeek V4 Flash + Kimi K2.7 Code (added 2026-07-12)
 
 `models.json` also registers **Makora** (`https://inference.makora.com/v1`,
-OpenAI-completions, auth via `$MAKORA_API_KEY` exported in `~/.bashrc`) with
-two models, both speed-verified against our own key:
+OpenAI-completions, auth via `$MAKORA_API_KEY` — the key lives in
+`~/.makora.env`, chmod 600, sourced from `~/.bashrc`) with two models, both
+speed-verified against our own key:
 
 - **DeepSeek V4 Flash** — measured 272 tok/s decode, $0.096/$0.237 per 1M
   (cached input $0.0723 — only a 25% discount on Makora, nothing like the 98%
@@ -626,8 +627,9 @@ Notes:
 ## Recreating from scratch
 
 1. Install pi, run it once, then `/login` for **groq** and **openrouter**.
-2. Export `MAKORA_API_KEY` in `~/.bashrc` (Makora auth is via env var in
-   models.json, not `/login`).
+2. Put `export MAKORA_API_KEY="..."` in `~/.makora.env` (chmod 600) and
+   source it from `~/.bashrc` (Makora auth is via env var in models.json,
+   not `/login`).
 3. Create the four files above under `~/.pi/agent/`
    (`models.json`, `AGENTS.md`, `extensions/strip-reasoning-replay.ts`,
    `extensions/groq-fallback.ts`), plus the `defaultModel`/`enabledModels`
