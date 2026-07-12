@@ -79,6 +79,25 @@
     <option value="side">Side</option>
   </select>
 </div>
+<div class="group">
+  <label>Hose style <span class="val" id="hoseStyle-val"></span></label>
+  <select id="hoseStyle" style="background:#333; color:#eee; font-family:monospace; font-size:14px; padding:4px; border:1px solid #555; border-radius:3px;">
+    <option value="simple">Simple</option>
+    <option value="pumpers">Pumpers</option>
+  </select>
+</div>
+<div class="group">
+  <label>Helper number every Nth blob <span class="val" id="pityEvery-val"></span></label>
+  <div><small style="color:#888">while a sum is in progress, every Nth blue blob completes it exactly (1 = every blob)</small></div>
+  <input type="range" id="pityEvery" min="1" max="10" step="1">
+  <input type="number" id="pityEvery-num" min="1" max="10" step="1">
+</div>
+<div class="group">
+  <label>Allowed targets</label>
+  <input type="text" id="allowedTargets" placeholder="e.g. 10 or 5,10,20 — empty = random 3-20"
+    style="width:100%; box-sizing:border-box; background:#333; color:#f84; font-family:monospace; font-size:14px; padding:6px; border:1px solid #555; border-radius:3px;">
+  <div><small style="color:#888">comma-separated; each round's target sum is picked from this list (blobs carry 1..target-1)</small></div>
+</div>
 
 <button onclick="push()">Push to game</button>
 <button onclick="restoreDefaults()" style="background:#888;">Restore defaults</button>
@@ -97,9 +116,13 @@ const DEFAULTS = {
   shipSpeed: 4,
   restartDelay: 5,
   lavaSizeStd: 4,
+  pityEvery: 4,
 };
-const rangeFields = ['lavaSpeed','lavaSizeMin','lavaSizeMax','lavaSpawnRate','hoseCount','shipSize','shipSpeed','restartDelay','lavaSizeStd','lavaHarmPercent'];
-const selectFields = ['uiLayout'];
+const rangeFields = ['lavaSpeed','lavaSizeMin','lavaSizeMax','lavaSpawnRate','hoseCount','shipSize','shipSpeed','restartDelay','lavaSizeStd','lavaHarmPercent','pityEvery'];
+const selectFields = ['uiLayout', 'hoseStyle'];
+const textFields = ['allowedTargets'];
+const SELECT_DEFAULTS = { uiLayout: 'bottom', hoseStyle: 'simple' };
+const TEXT_DEFAULTS = { allowedTargets: '10' };
 
 
 function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
@@ -157,9 +180,13 @@ async function load() {
   document.getElementById('shipSize-val').textContent = cfg.shipSize;
   document.getElementById('shipSpeed-val').textContent = cfg.shipSpeed;
   document.getElementById('restartDelay-val').textContent = cfg.restartDelay;
+  document.getElementById('pityEvery-val').textContent = cfg.pityEvery;
   for (const f of selectFields) {
     document.getElementById(f).value = cfg[f];
     document.getElementById(f + '-val').textContent = cfg[f].charAt(0).toUpperCase() + cfg[f].slice(1);
+  }
+  for (const f of textFields) {
+    document.getElementById(f).value = cfg[f] || '';
   }
   toggleStdGroup();
   document.getElementById('status').textContent = 'Loaded from server.';
@@ -198,6 +225,7 @@ const rangeBounds = {
   shipSize: [5, 100],
   shipSpeed: [0.5, 20],
   restartDelay: [0, 30],
+  pityEvery: [1, 10],
 };
 
 document.getElementById('lavaSizeMin').addEventListener('input', function() {
@@ -305,6 +333,7 @@ async function push() {
   const body = {};
   for (const f of rangeFields) body[f] = parseFloat(document.getElementById(f).value);
   for (const f of selectFields) body[f] = document.getElementById(f).value;
+  for (const f of textFields) body[f] = document.getElementById(f).value.trim();
   await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
   document.getElementById('status').textContent = 'Pushed at ' + new Date().toLocaleTimeString();
 }
@@ -318,9 +347,11 @@ function restoreDefaults() {
     rangeEl.dispatchEvent(new Event('input'));
   }
   for (const f of selectFields) {
-    document.getElementById(f).value = 'bottom';
-    document.getElementById(f + '-val').textContent = 'Bottom';
+    const d = SELECT_DEFAULTS[f];
+    document.getElementById(f).value = d;
+    document.getElementById(f + '-val').textContent = d.charAt(0).toUpperCase() + d.slice(1);
   }
+  for (const f of textFields) document.getElementById(f).value = TEXT_DEFAULTS[f];
   updateHarmThreshold();
   document.getElementById('status').textContent = 'Restored to defaults.';
 }

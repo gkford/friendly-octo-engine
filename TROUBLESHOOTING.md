@@ -1,54 +1,53 @@
 # Troubleshooting
 
-## GitHub Codespaces
+## Start here: `./start.sh`
 
-### Port visibility resets after restart
+One command does everything: starts the server (if needed), opens a fresh
+Cloudflare quick tunnel, verifies the game is reachable from outside, and
+regenerates `game-starter-QR.png`. Re-run it any time something seems off.
 
-Symptom: iPad suddenly asks to *sign in to GitHub* instead of showing the game.
+- The tunnel URL is **random on every start** — that's how quick tunnels work.
+  Always scan the freshly generated QR; never bookmark the URL on the iPad.
+- Logs: `server.log` (game server), `.tools/cloudflared.log` (tunnel).
+- One-time iPad setup: add `trycloudflare.com` to the Screen Time allowlist.
 
-```bash
-gh codespace ports visibility 8080:public -c "$CODESPACE_NAME"
-```
+### Cloudflare tunnel not working?
 
-### Tunnel 404 after codespace container restart
+1. Re-run `./start.sh` — it kills the old tunnel and starts a clean one.
+2. Check `.tools/cloudflared.log` for errors.
+3. If the iPad gets a block page, confirm `trycloudflare.com` is allowlisted
+   in Screen Time (subdomains are covered automatically).
 
-After a disconnect/container restart, the forwarded URL returns a hard HTTP 404.
+## Fallback: GitHub Codespaces port forwarding
 
-**How to diagnose:**
-1. Server healthy locally?
-   ```bash
-   ps aux | grep "node server.js" | grep -v grep
-   curl -sI http://localhost:8080/        # expect 200
-   ```
-2. Port forwarded and public?
-   ```bash
-   gh codespace ports -c "$CODESPACE_NAME"
-   ```
-3. Tunnel returning 404?
-   ```bash
-   curl -sI "https://${CODESPACE_NAME}-8080.app.github.dev/"
-   ```
-   If 404 comes from `x-served-by: tunnels-prod-...`, the tunnel registration went stale on GitHub's side.
+This was the original approach. It works, but is flaky in ways we verified
+empirically (July 2026) — which is why `start.sh` uses Cloudflare instead:
 
-**The fix — stop and restart the codespace:**
-1. Go to https://github.com/codespaces → find codespace → **⋯ → Stop codespace**
-2. Wait, then reopen it
-3. Restart the game server and re-run the port visibility command
-4. **Wait up to ~10 minutes** — the Codespaces Virtual Machine Agent (runs outside the container) needs time to re-register the tunnel. Poll:
-   ```bash
-   watch -n 15 'curl -sI "https://${CODESPACE_NAME}-8080.app.github.dev/" | head -1'
-   ```
-
-**Prevention:**
-- Pin port config in `.devcontainer/devcontainer.json`:
-  ```json
-  {
-    "forwardPorts": [8080],
-    "portsAttributes": {
-      "8080": { "label": "Lava Runner", "visibility": "public" }
-    }
-  }
+- **Port visibility resets to private on every codespace restart, by design.**
+  `"visibility": "public"` in devcontainer.json `portsAttributes` is NOT a
+  supported feature — it's an open feature request since 2022
+  ([#10394](https://github.com/orgs/community/discussions/10394),
+  [#4068](https://github.com/orgs/community/discussions/4068)). The only way
+  to make a port public is manually, after every restart:
+  ```bash
+  gh codespace ports visibility 8080:public -c "$CODESPACE_NAME"
   ```
-  (May still revert on restart — keep the `gh` command handy.)
-- Bump the idle timeout (Settings → Codespaces → Default idle timeout) for couch sessions.
-- Run a preflight check before each play session: server up → port public → `curl` the public URL.
+- **After a restart, even a public port can 404 for up to ~10 minutes**
+  (we measured 8) while GitHub's tunnel agent re-registers. The 404 comes from
+  the tunnel edge (`x-served-by: tunnels-prod-...`). There is no supported way
+  to speed this up; GitHub support has attributed it to
+  [Microsoft/Azure infrastructure](https://github.com/orgs/community/discussions/156546).
+  Verify from inside the codespace and just wait:
+  ```bash
+  curl -s -o /dev/null -w "%{http_code}\n" "https://${CODESPACE_NAME}-8080.app.github.dev/"
+  ```
+- **iPad shows a GitHub sign-in screen** → the port is private (see above), or
+  Safari is loading a dead codespace's URL from history. The sign-in page is a
+  hard dead end on the kid's iPad (`github.com` isn't allowlisted) — the fix is
+  always server-side or a fresh QR, never signing in.
+
+## General
+
+- The game server must be restarted after every codespace restart
+  (`./start.sh` handles this): background processes don't survive a stop.
+- Config lives in server memory — a server restart resets all dev-panel tweaks.

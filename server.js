@@ -18,6 +18,9 @@ const config = {
   hoseCount: 2,
   restartDelay: 5,
   uiLayout: 'bottom',
+  hoseStyle: 'simple',
+  allowedTargets: '10',
+  pityEvery: 4,
 };
 
 app.get('/config', (req, res) => res.json(config));

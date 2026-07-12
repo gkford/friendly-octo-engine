@@ -31,11 +31,12 @@ node server.js
 
 No build step, no persistence — config lives in server memory and resets on restart.
 
-## Running from GitHub Codespaces
+## Getting it on the iPad
 
-1. `node server.js` (port 8080)
-2. Make the port public: `gh codespace ports visibility 8080:public -c "$CODESPACE_NAME"`
-3. Get the URL: `gh codespace ports -c "$CODESPACE_NAME"`
-4. Open that URL in Safari on the iPad
+```bash
+./start.sh
+```
 
-→ **Troubleshooting for Codespaces issues** (port visibility, tunnel 404s, etc.): see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
+That starts the server, opens a Cloudflare tunnel, verifies it end-to-end, and regenerates `game-starter-QR.png`. Scan the QR with the iPad camera. **The URL/QR changes every start — always scan the fresh one.** One-time iPad setup: allow `trycloudflare.com` in Screen Time.
+
+→ Problems, or why we don't use GitHub's own port forwarding: see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
