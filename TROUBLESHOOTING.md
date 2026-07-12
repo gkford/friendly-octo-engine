@@ -4,10 +4,15 @@
 
 One command does everything: starts the server (if needed), opens a fresh
 Cloudflare quick tunnel, verifies the game is reachable from outside, and
-regenerates `game-starter-QR.png`. Re-run it any time something seems off.
+regenerates `game-starter-QR.png` and `LINKS.md`. Re-run it any time
+something seems off.
 
+- **Current URLs always live in `LINKS.md`** (gitignored, rewritten only
+  after the tunnel verifies — if it exists, its links were good as of the
+  timestamp inside).
 - The tunnel URL is **random on every start** — that's how quick tunnels work.
-  Always scan the freshly generated QR; never bookmark the URL on the iPad.
+  Always scan the freshly generated QR or use `LINKS.md`; never bookmark the
+  URL on the iPad.
 - Logs: `server.log` (game server), `.tools/cloudflared.log` (tunnel).
 - One-time iPad setup: add `trycloudflare.com` to the Screen Time allowlist.
 
