@@ -37,6 +37,6 @@ No build step, no persistence — config lives in server memory and resets on re
 ./start.sh
 ```
 
-That starts the server, opens a Cloudflare tunnel, verifies it end-to-end, and regenerates `game-starter-QR.png`. Scan the QR with the iPad camera. **The URL/QR changes every start — always scan the fresh one.** One-time iPad setup: allow `trycloudflare.com` in Screen Time.
+That starts the server, opens a Cloudflare tunnel, verifies it end-to-end, and regenerates `game-starter-QR.png` **and `LINKS.md`** — the latter lists every current URL (game, dev panel, sound lab, local equivalents). Scan the QR with the iPad camera, or grab links from `LINKS.md`. **The URL/QR changes every start — always scan the fresh one.** One-time iPad setup: allow `trycloudflare.com` in Screen Time.
 
 → Problems, or why we don't use GitHub's own port forwarding: see [TROUBLESHOOTING.md](./TROUBLESHOOTING.md)
