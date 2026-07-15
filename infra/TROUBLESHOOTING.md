@@ -2,23 +2,30 @@
 
 ## Start here: `./infra/start.sh`
 
-One command does everything: starts the server (if needed), opens a fresh
-Cloudflare quick tunnel, verifies the game is reachable from outside, and
-regenerates `game-starter-QR.png` and `LINKS.md`. Re-run it any time
-something seems off.
+One command does everything: starts whatever is down (server and/or tunnel),
+verifies the game is reachable from outside, and keeps
+`game-starter-QR.png` and `LINKS.md` in sync. Re-run it any time something
+seems off — it's idempotent and **keeps the current URL whenever the tunnel
+is still alive** (e.g. after a server crash or a `server.js` change).
 
 - **Current URLs always live in `LINKS.md`** (gitignored, rewritten only
   after the tunnel verifies — if it exists, its links were good as of the
   timestamp inside).
-- The tunnel URL is **random on every start** — that's how quick tunnels work.
-  Always scan the freshly generated QR or use `LINKS.md`; never bookmark the
-  URL on the iPad.
+- The tunnel URL is **random per tunnel process** — that's how quick tunnels
+  work; it can't be pinned. It only changes when the tunnel itself dies
+  (codespace stop, cloudflared crash) or on a forced restart. Always scan the
+  freshly generated QR or use `LINKS.md`; never bookmark the URL on the iPad.
+- A forced full restart is gated so agents don't do it casually:
+  `LAVA_RESTART_OK=1 ./infra/start.sh --restart` (changes the URL).
+- Fresh tunnel hostnames occasionally never appear in DNS; `start.sh` waits
+  60 s then tells you to re-run, which rolls a new hostname.
 - Logs: `infra/server.log` (game server), `infra/.tools/cloudflared.log` (tunnel).
 - One-time iPad setup: add `trycloudflare.com` to the Screen Time allowlist.
 
 ### Cloudflare tunnel not working?
 
-1. Re-run `./infra/start.sh` — it kills the old tunnel and starts a clean one.
+1. Re-run `./infra/start.sh` — it reuses the tunnel if it's actually healthy,
+   otherwise replaces it with a clean one.
 2. Check `infra/.tools/cloudflared.log` for errors.
 3. If the iPad gets a block page, confirm `trycloudflare.com` is allowlisted
    in Screen Time (subdomains are covered automatically).
