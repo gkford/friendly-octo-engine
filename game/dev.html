@@ -22,8 +22,8 @@
 
 <div class="group">
   <label>Lava speed <span class="val" id="lavaSpeed-val"></span></label>
-  <input type="range" id="lavaSpeed" min="0.01" max="0.5" step="0.005">
-  <input type="number" id="lavaSpeed-num" min="0.01" max="0.5" step="0.005">
+  <input type="range" id="lavaSpeed" min="0.01" max="5" step="0.05">
+  <input type="number" id="lavaSpeed-num" min="0.01" max="5" step="0.05">
 </div>
 <div class="group">
   <label>Lava min size <span class="val" id="lavaSizeMin-val"></span></label>
@@ -66,6 +66,16 @@
   <label>Ship speed <span class="val" id="shipSpeed-val"></span></label>
   <input type="range" id="shipSpeed" min="0.5" max="20" step="0.5">
   <input type="number" id="shipSpeed-num" min="0.5" max="20" step="0.5">
+</div>
+<div class="group">
+  <label>Bullet speed <span class="val" id="bulletSpeed-val"></span></label>
+  <input type="range" id="bulletSpeed" min="1" max="30" step="0.5">
+  <input type="number" id="bulletSpeed-num" min="1" max="30" step="0.5">
+</div>
+<div class="group">
+  <label>Shoot delay (ms) <span class="val" id="shootDelay-val"></span></label>
+  <input type="range" id="shootDelay" min="10" max="1000" step="10">
+  <input type="number" id="shootDelay-num" min="10" max="1000" step="10">
 </div>
 <div class="group">
   <label>Restart delay (seconds) <span class="val" id="restartDelay-val"></span></label>
@@ -114,11 +124,13 @@ const DEFAULTS = {
   hoseCount: 2,
   shipSize: 24,
   shipSpeed: 4,
+  bulletSpeed: 8,
+  shootDelay: 200,
   restartDelay: 5,
   lavaSizeStd: 4,
   pityEvery: 4,
 };
-const rangeFields = ['lavaSpeed','lavaSizeMin','lavaSizeMax','lavaSpawnRate','hoseCount','shipSize','shipSpeed','restartDelay','lavaSizeStd','lavaHarmPercent','pityEvery'];
+const rangeFields = ['lavaSpeed','lavaSizeMin','lavaSizeMax','lavaSpawnRate','hoseCount','shipSize','shipSpeed','bulletSpeed','shootDelay','restartDelay','lavaSizeStd','lavaHarmPercent','pityEvery'];
 const selectFields = ['uiLayout', 'hoseStyle'];
 const textFields = ['allowedTargets'];
 const SELECT_DEFAULTS = { uiLayout: 'bottom', hoseStyle: 'simple' };
@@ -179,6 +191,8 @@ async function load() {
   document.getElementById('hoseCount-val').textContent = cfg.hoseCount;
   document.getElementById('shipSize-val').textContent = cfg.shipSize;
   document.getElementById('shipSpeed-val').textContent = cfg.shipSpeed;
+  document.getElementById('bulletSpeed-val').textContent = cfg.bulletSpeed;
+  document.getElementById('shootDelay-val').textContent = cfg.shootDelay;
   document.getElementById('restartDelay-val').textContent = cfg.restartDelay;
   document.getElementById('pityEvery-val').textContent = cfg.pityEvery;
   for (const f of selectFields) {
@@ -215,7 +229,7 @@ for (const f of selectFields) {
 }
 
 const rangeBounds = {
-  lavaSpeed: [0.01, 0.5],
+  lavaSpeed: [0.01, 5],
   lavaSizeMin: [1, 500],
   lavaSizeMax: [1, 500],
   lavaSizeStd: [1, 50],
@@ -224,6 +238,8 @@ const rangeBounds = {
   hoseCount: [1, 100],
   shipSize: [5, 100],
   shipSpeed: [0.5, 20],
+  bulletSpeed: [1, 30],
+  shootDelay: [10, 1000],
   restartDelay: [0, 30],
   pityEvery: [1, 10],
 };

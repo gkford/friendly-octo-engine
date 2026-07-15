@@ -5,14 +5,14 @@ app.use(express.json());
 app.use(express.static(__dirname)); // serve the game folder only, regardless of cwd
 
 const config = {
-  lavaSpeed: 0.5,
+  lavaSpeed: 1.5,
   lavaGravity: 0.03,
   lavaSpawnRate: 80,
   lavaSizeMin: 10,
   lavaSizeMax: 50,
   lavaHarmPercent: 50,
-  shipSpeed: 4,
-  bulletSpeed: 8,
+  shipSpeed: 6,
+  bulletSpeed: 14,
   shootDelay: 200,
   shipSize: 24,
   hoseCount: 2,
