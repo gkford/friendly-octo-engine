@@ -39,6 +39,37 @@ The game polls the server for config every second, so slider changes on the lapt
 
 One-time iPad setup: allow `trycloudflare.com` in Screen Time.
 
+## Getting logs from the iPad
+
+The game sends its debug events back to this machine while it is being played.
+You do not need the iPad to read them. There is one command:
+
+```bash
+./infra/logs.sh          # show the logs of the most recent game played
+./infra/logs.sh --live   # keep printing new logs while a game is being played (Ctrl-C to stop)
+./infra/logs.sh --all    # show everything ever logged
+```
+
+Rules:
+
+- To see what happened in a game: run `./infra/logs.sh`. That is usually all you need.
+- To watch a game as it is played: run `./infra/logs.sh --live`.
+- Do not read `infra/client.log` by hand first — the script exists so you don't have to.
+- If the script says "No logs yet": run `./infra/start.sh`, then have the iPad reload the game page.
+
+What the log lines mean:
+
+| Line contains | Meaning |
+|---|---|
+| `=== game start ===` / `=== game over ===` | A game began / ended |
+| `page BLUR ... after buttons [...]` | Safari lost focus — controller input stops. The numbers are the controller buttons pressed just before it happened |
+| `PAD GONE` / `PAD STALLED` | Safari stopped seeing the controller / stopped receiving its input |
+| `paused` / `resumed` | The game auto-paused on a dropout and auto-resumed |
+| `ERR:` | A JavaScript error in the game |
+
+Controller dropouts on the iPad are a known issue; the fix checklist is in
+[CONTROLLER-CHECKLIST.md](./CONTROLLER-CHECKLIST.md).
+
 ## Layout
 
 Two folders, deliberately separate:
@@ -54,7 +85,7 @@ Two folders, deliberately separate:
 | `game/index.html` | The entire game — canvas rendering, game loop, gamepad input, all in one inline `<script>` |
 | `game/dev.html` | Dev dashboard — sliders/selects that GET and POST `/config` |
 | `game/sound.html` | Sound lab — design sound effects and preview procedural music tracks |
-| `game/server.js` | Express server — serves the `game/` folder, holds in-memory `config`, exposes `GET/POST /config` |
+| `game/server.js` | Express server — serves the `game/` folder, holds in-memory `config`, exposes `GET/POST /config`, receives game logs on `POST /log` (written to `infra/client.log`) |
 
 No build step, no persistence — config lives in server memory and resets on restart (the dev panel's current values are the source of truth while playing).
 

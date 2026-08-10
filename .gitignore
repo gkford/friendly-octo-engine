@@ -1,6 +1,8 @@
 node_modules/
 .tools/
 server.log
+client.log
+client.log.1
 nohup.out
 LINKS.md
 game-starter-QR.png

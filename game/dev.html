@@ -78,6 +78,11 @@
   <input type="number" id="shootDelay-num" min="10" max="1000" step="10">
 </div>
 <div class="group">
+  <label>Bullet colour rotation</label>
+  <div><small style="color:#888">toggle which colours X cycles through (black is a default)</small></div>
+  <div id="bulletColors-group" style="margin-top:6px; display:flex; flex-wrap:wrap; gap:8px;"></div>
+</div>
+<div class="group">
   <label>Restart delay (seconds) <span class="val" id="restartDelay-val"></span></label>
   <input type="range" id="restartDelay" min="0" max="30" step="0.5">
   <input type="number" id="restartDelay-num" min="0" max="30" step="0.5">
@@ -202,6 +207,7 @@ async function load() {
   for (const f of textFields) {
     document.getElementById(f).value = cfg[f] || '';
   }
+  setBulletColorChecks(String(cfg.bulletColors || '').split(','));
   toggleStdGroup();
   document.getElementById('status').textContent = 'Loaded from server.';
 }
@@ -243,6 +249,52 @@ const rangeBounds = {
   restartDelay: [0, 30],
   pityEvery: [1, 10],
 };
+
+// ─── Bullet colour rotation ────────────────────────────────
+const COLOR_PALETTE = [
+  { key: 'black',  hex: '#000000', label: 'Black' },
+  { key: 'red',    hex: '#ff2d55', label: 'Red' },
+  { key: 'orange', hex: '#ff9500', label: 'Orange' },
+  { key: 'yellow', hex: '#ffd60a', label: 'Yellow' },
+  { key: 'green',  hex: '#34c759', label: 'Green' },
+  { key: 'cyan',   hex: '#00c7ff', label: 'Cyan' },
+  { key: 'blue',   hex: '#0a84ff', label: 'Blue' },
+  { key: 'purple', hex: '#bf5af2', label: 'Purple' },
+  { key: 'pink',   hex: '#ff375f', label: 'Pink' },
+];
+const bulletColorGroup = document.getElementById('bulletColors-group');
+const bulletColorChecks = {};
+function buildBulletColorCheckboxes() {
+  bulletColorGroup.innerHTML = '';
+  for (const c of COLOR_PALETTE) {
+    const wrap = document.createElement('label');
+    wrap.style.cssText = 'display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer;';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = c.key;
+    cb.style.cssText = 'width:auto;';
+    const swatch = document.createElement('span');
+    swatch.style.cssText = `display:inline-block;width:12px;height:12px;border-radius:3px;background:${c.hex};border:1px solid #888;`;
+    const txt = document.createElement('span');
+    txt.textContent = c.label;
+    txt.style.color = '#ddd';
+    wrap.appendChild(cb);
+    wrap.appendChild(swatch);
+    wrap.appendChild(txt);
+    bulletColorGroup.appendChild(wrap);
+    bulletColorChecks[c.key] = cb;
+  }
+}
+function setBulletColorChecks(list) {
+  const enabled = list.map(s => s.trim().toLowerCase());
+  for (const c of COLOR_PALETTE) {
+    bulletColorChecks[c.key].checked = enabled.includes(c.key);
+  }
+}
+function getBulletColorsValue() {
+  return COLOR_PALETTE.filter(c => bulletColorChecks[c.key].checked).map(c => c.key).join(',');
+}
+buildBulletColorCheckboxes();
 
 document.getElementById('lavaSizeMin').addEventListener('input', function() {
   const max = parseFloat(document.getElementById('lavaSizeMax').value);
@@ -350,6 +402,7 @@ async function push() {
   for (const f of rangeFields) body[f] = parseFloat(document.getElementById(f).value);
   for (const f of selectFields) body[f] = document.getElementById(f).value;
   for (const f of textFields) body[f] = document.getElementById(f).value.trim();
+  body.bulletColors = getBulletColorsValue();
   await fetch('/config', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) });
   document.getElementById('status').textContent = 'Pushed at ' + new Date().toLocaleTimeString();
 }
@@ -368,6 +421,7 @@ function restoreDefaults() {
     document.getElementById(f + '-val').textContent = d.charAt(0).toUpperCase() + d.slice(1);
   }
   for (const f of textFields) document.getElementById(f).value = TEXT_DEFAULTS[f];
+  setBulletColorChecks('black,red,orange,yellow,green,cyan,blue,purple,pink'.split(','));
   updateHarmThreshold();
   document.getElementById('status').textContent = 'Restored to defaults.';
 }

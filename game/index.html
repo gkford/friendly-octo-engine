@@ -54,6 +54,7 @@ const cfg = {
   hoseStyle: 'simple', // 'simple' T-hoses or animated 'pumpers'
   allowedTargets: '10', // comma-separated list the target is picked from; empty = random 3..20
   pityEvery: 4,        // every Nth safe blob completes the sum (while one is in progress)
+  bulletColors: 'black,red,orange,yellow,green,cyan,blue,purple,pink', // enabled rotation colours
   get lavaHarmSize() {
     return cfg.lavaSizeMin + (cfg.lavaHarmPercent / 100) * (cfg.lavaSizeMax - cfg.lavaSizeMin);
   },
@@ -316,13 +317,54 @@ let frame = 0;
 let state = 'menu'; // 'menu' | 'playing'
 let menuIndex = 0;
 const games = [
-  { name: 'Lava Runner' },
+  { name: 'Lava Runner', mode: 'classic' },
+  { name: 'Ones to 9000', mode: 'ones' },
 ];
+let gameMode = 'classic';
 
 // ─── Bullets ─────────────────────────────────────
 const bullets = [];
 let lastShot = 0;
 const SHOOT_DELAY = 200;
+
+// Bullet colour cycling — press X (gamepad button 2) or X on the keyboard to
+// switch all bullets through the enabled rainbow colours. Which colours are in
+// the rotation is driven by the server config `cfg.bulletColors` (a comma-
+// separated list of colour keys), editable live from the dev panel.
+const COLOR_PALETTE = {
+  black:  '#000000',
+  red:    '#ff2d55', // red-pink
+  orange: '#ff9500',
+  yellow: '#ffd60a',
+  green:  '#34c759',
+  cyan:   '#00c7ff',
+  blue:   '#0a84ff',
+  purple: '#bf5af2',
+  pink:   '#ff375f', // hot pink
+};
+
+let bulletColor = '#48f'; // default blue
+// Active rotation — recomputed from cfg.bulletColors on each config poll.
+function getActiveBulletColors() {
+  const raw = String(cfg.bulletColors || '').trim();
+  const list = raw
+    .split(',')
+    .map(s => s.trim().toLowerCase())
+    .filter(k => COLOR_PALETTE[k] !== undefined);
+  return list.length > 0 ? list : Object.keys(COLOR_PALETTE);
+}
+function cycleBulletColor() {
+  const active = getActiveBulletColors();
+  // Pick a new random colour from the enabled rotation, avoiding repeats.
+  let currentKey = Object.keys(COLOR_PALETTE).find(k => COLOR_PALETTE[k] === bulletColor);
+  let nextKey = currentKey;
+  let tries = 0;
+  while (nextKey === currentKey && tries < active.length * 2) {
+    nextKey = active[Math.floor(Math.random() * active.length)];
+    tries++;
+  }
+  bulletColor = COLOR_PALETTE[nextKey] !== undefined ? COLOR_PALETTE[nextKey] : bulletColor;
+}
 
 // ─── Power bar & splashes ────────────────────────
 let POWER_TARGET = 10;
@@ -359,17 +401,59 @@ function getAudioCtx() {
   return sharedAudioCtx;
 }
 
+// ─── Remote log shipping ─────────────────────────
+// Every debug message is also queued and POSTed to /log (same origin
+// through the tunnel); the server appends to infra/client.log, readable
+// from the codespace with ./infra/logs.sh. sendBeacon still delivers
+// while the page is blurred — exactly when the interesting events happen.
+const LOG_SESSION = Math.random().toString(36).slice(2, 8);
+const logQueue = ['page load: ' + navigator.userAgent];
+function shipLog(msg) { logQueue.push(msg); }
+function flushLogs() {
+  if (!logQueue.length) return;
+  const body = JSON.stringify({ session: LOG_SESSION, lines: logQueue.splice(0) });
+  try {
+    if (navigator.sendBeacon && navigator.sendBeacon('/log', body)) return;
+  } catch (e) {}
+  fetch('/log', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: true }).catch(() => {});
+}
+setInterval(flushLogs, 2000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') flushLogs(); });
+
 // ─── Debug overlay ───────────────────────────────
 const debugEl = document.getElementById('debug');
 let debugMessages = [];
 function showDebug(msg) {
+  shipLog(msg);
   debugMessages.push(msg);
   if (debugMessages.length > 6) debugMessages.shift();
   debugEl.textContent = debugMessages.join('\n');
 }
 window.addEventListener('error', e => showDebug('ERR: ' + e.message));
 window.addEventListener('unhandledrejection', e => showDebug('REJ: ' + (e.reason||'')));
-window.addEventListener('gamepadconnected', e => showDebug('PAD: ' + e.gamepad.id + ' mapping=' + e.gamepad.mapping));
+function ts() { return new Date().toTimeString().slice(0, 8); }
+window.addEventListener('gamepadconnected', e => showDebug(ts() + ' PAD: ' + e.gamepad.id + ' mapping=' + e.gamepad.mapping));
+window.addEventListener('gamepaddisconnected', e => showDebug(ts() + ' PAD LOST: ' + e.gamepad.id));
+document.addEventListener('visibilitychange', () => showDebug(ts() + ' visibility=' + document.visibilityState));
+// Blame tracking: which controller buttons were down just before a blur.
+// Standard mapping: 0=A 1=B 2=X 3=Y 4=L1 5=R1 6=L2 7=R2 8=select 9=start
+// 10=L3 11=R3 12-15=dpad 16=home 17+=extras (Pro 3 paddles land here).
+let lastPressed = { t: 0, ids: [] };
+function trackPressedButtons() {
+  const gp = getGamepad();
+  if (!gp) return;
+  const ids = [];
+  for (let i = 0; i < gp.buttons.length; i++) if (btnPressed(gp.buttons[i])) ids.push(i);
+  if (ids.length) lastPressed = { t: Date.now(), ids };
+}
+window.addEventListener('blur', () => {
+  const age = Date.now() - lastPressed.t;
+  const blame = lastPressed.ids.length && age < 1500
+    ? ' after buttons [' + lastPressed.ids.join(',') + '] ' + (age < 120 ? 'just now' : (age / 1000).toFixed(1) + 's ago')
+    : ' (no recent buttons)';
+  showDebug(ts() + ' page BLUR' + blame);
+});
+window.addEventListener('focus', () => showDebug(ts() + ' page focus'));
 // iOS gesture unlock: resume AudioContext on every gesture (persistent)
 function reportError(e) { showDebug('ERR: ' + (e && e.message || e)); }
 function unlockAudio() {
@@ -465,12 +549,92 @@ function getAllowedTargets() {
 }
 
 function randomPowerTarget() {
+  if (gameMode === 'ones') {
+    POWER_TARGET = randomOnesTarget(); // dev-panel target list doesn't apply here
+    return;
+  }
   const list = getAllowedTargets();
   if (list) {
     POWER_TARGET = list[Math.floor(Math.random() * list.length)];
   } else {
     POWER_TARGET = 3 + Math.floor(Math.random() * 18); // 3..20
   }
+}
+
+// ─── "Ones" mode: every blue number must contain a 1 ─
+function hasOne(n) { return String(n).includes('1'); }
+
+// Random d-digit number that contains a '1'
+function randomOnesNumber(digits) {
+  const lo = digits === 1 ? 1 : Math.pow(10, digits - 1);
+  const hi = Math.pow(10, digits) - 1;
+  for (;;) {
+    const v = lo + Math.floor(Math.random() * (hi - lo + 1));
+    if (hasOne(v)) return v;
+  }
+}
+
+// Build the target as a sum of 3–5 numbers that all contain a '1', so every
+// target is guaranteed reachable by a short, findable path (up to 9000).
+function randomOnesTarget() {
+  for (;;) {
+    const k = 3 + Math.floor(Math.random() * 3); // 3..5 parts
+    let sum = 0;
+    for (let i = 0; i < k; i++) {
+      const roll = Math.random();
+      const digits = roll < 0.3 ? 1 : roll < 0.6 ? 2 : roll < 0.85 ? 3 : 4;
+      sum += randomOnesNumber(digits);
+    }
+    if (sum >= 100 && sum <= 9000) return sum;
+  }
+}
+
+// A good next number for the remaining amount R: completes the sum if it can,
+// otherwise leaves a remainder that is itself easy to finish. Picks randomly
+// among the best few candidates so help never feels scripted.
+function bestOnesStep(R, allowComplete) {
+  if (R < 1) return null;
+  // Offer the exact finisher sometimes (always when the remainder is tiny) —
+  // but never as the very first catch, so a target is never a one-blob win.
+  if (allowComplete && hasOne(R) && (R < 20 || Math.random() < 0.6)) return R;
+  // Otherwise take a healthy bite (≤60% of what's left) that leaves an
+  // easy-to-finish remainder.
+  const stepCap = Math.max(Math.ceil(R * 0.6), 19);
+  let bestTier = -1;
+  let best = [];
+  for (let v = 1; v <= Math.min(R, stepCap); v++) {
+    if (!hasOne(v)) continue;
+    const rem = R - v;
+    const tier = rem === 0 ? 3 : hasOne(rem) ? 2 : rem >= 11 ? 1 : 0;
+    if (tier > bestTier) { bestTier = tier; best = [v]; }
+    else if (tier === bestTier) best.push(v);
+  }
+  if (best.length === 0) return null;
+  best.sort((a, b) => b - a); // prefer big steps toward big targets
+  const top = best.slice(0, Math.min(5, best.length));
+  return top[Math.floor(Math.random() * top.length)];
+}
+
+function pickOnesBlobValue() {
+  const R = POWER_TARGET - powerBar.bricks;
+  safeSpawnsSinceHelp++;
+  const forceHelp = safeSpawnsSinceHelp >= Math.max(1, Math.round(cfg.pityEvery));
+  // Most spawns steer the player: pity guarantees a good step every Nth blob,
+  // and a little over half of the rest are good steps too.
+  if (forceHelp || Math.random() < 0.55) {
+    const v = bestOnesStep(R, powerBar.bricks > 0);
+    if (v) {
+      safeSpawnsSinceHelp = 0;
+      return v;
+    }
+  }
+  // The rest are random 1-containing numbers scaled to what's left — some
+  // overshoot, and dodging those is part of the game.
+  const maxDigits = Math.max(1, String(Math.max(R, 10)).length);
+  const digits = 1 + Math.floor(Math.random() * maxDigits);
+  let v = randomOnesNumber(digits);
+  if (v > R && Math.random() < 0.6) v = bestOnesStep(R, powerBar.bricks > 0) || 1; // soften, like classic
+  return v;
 }
 
 // ─── Random lava size helpers ────────────────────
@@ -483,6 +647,11 @@ function gaussianRandom(mean, std) {
 
 // The pool of values a safe blob can carry for the current target
 function valuePool() {
+  if (gameMode === 'ones') {
+    const out = [];
+    for (let v = 1; v <= POWER_TARGET; v++) if (hasOne(v)) out.push(v);
+    return out.length ? out : [1];
+  }
   const n = Math.max(1, POWER_TARGET - 1);
   return Array.from({ length: n }, (_, i) => i + 1); // 1..target-1
 }
@@ -490,6 +659,7 @@ function valuePool() {
 let safeSpawnsSinceHelp = 0;
 
 function pickBlobValue() {
+  if (gameMode === 'ones') return pickOnesBlobValue();
   const pool = valuePool();
   const remaining = POWER_TARGET - powerBar.bricks;
   const inProgress = barState === 'normal' && powerBar.bricks > 0;
@@ -522,6 +692,13 @@ function pickBlobValue() {
 // possible value, ordered so bigger numbers make bigger blobs. 90% of the
 // band is used, leaving a visual gap between adjacent bands.
 function mapValueToRadius(value) {
+  if (gameMode === 'ones') {
+    // One size band per digit count (1–4 digits): 1000s are huge, 1s tiny
+    const digits = Math.min(4, String(value).length);
+    const mn = cfg.lavaSizeMin;
+    const bandSize = (cfg.lavaHarmSize - mn) / 4;
+    return mn + (digits - 1) * bandSize + Math.random() * bandSize * 0.9;
+  }
   const pool = valuePool();
   const idx = Math.max(0, pool.indexOf(value));
   const mn = cfg.lavaSizeMin;
@@ -636,7 +813,43 @@ function getGamepad() {
 }
 function btnPressed(btn) { return btn && (btn.pressed || btn.value > 0.5); }
 
-const BTN_A = 0, BTN_B = 1, DPAD_LEFT = 14, DPAD_RIGHT = 15;
+// ─── Gamepad watchdog: diagnose mid-game input dropouts ─
+// Once a second, log transitions in pad presence and input freshness.
+// gp.timestamp only advances when Safari receives new HID state, so a
+// frozen timestamp WHILE you are pressing buttons means Safari stopped
+// delivering input even though the pad is still enumerated.
+let wdLast = 0, wdHadPad = null, wdPadTs = -1, wdStalled = false, wdId = '';
+function gamepadWatchdog() {
+  const now = Date.now();
+  if (now - wdLast < 1000) return;
+  wdLast = now;
+  const gp = getGamepad();
+  if (!!gp !== wdHadPad) {
+    showDebug(ts() + (gp
+      ? ' pad present idx=' + gp.index + ' [' + (gp.id || '?').slice(0, 24) + ']'
+      : ' PAD GONE from getGamepads()') + ' focus=' + document.hasFocus());
+    wdHadPad = !!gp;
+    wdStalled = false;
+    wdPadTs = gp ? gp.timestamp : -1;
+    wdId = gp ? gp.id : '';
+    return;
+  }
+  if (!gp) return;
+  if (gp.id !== wdId) { // same slot, different device = mode/profile switch
+    showDebug(ts() + ' PAD CHANGED ID: ' + (gp.id || '?').slice(0, 30));
+    wdId = gp.id;
+  }
+  const stalled = gp.timestamp === wdPadTs;
+  if (stalled !== wdStalled) {
+    showDebug(ts() + (stalled
+      ? ' PAD STALLED (listed but timestamp frozen)'
+      : ' pad resumed') + ' focus=' + document.hasFocus());
+    wdStalled = stalled;
+  }
+  wdPadTs = gp.timestamp;
+}
+
+const BTN_A = 0, BTN_B = 1, BTN_X = 2, DPAD_LEFT = 14, DPAD_RIGHT = 15;
 let prevGpButtons = [];
 function gpEdge(index) {
   const gp = getGamepad();
@@ -652,6 +865,7 @@ function update() {
   if (won && !gameOver && Date.now() >= winDelayUntil) {
     gameOver = true;
     gameOverTime = Date.now();
+    shipLog('=== game over (won) ===');
   }
 
   const gp = getGamepad();
@@ -732,6 +946,7 @@ function update() {
         x: ship.x,
         y: ship.y - ship.h / 2,
         vy: -cfg.bulletSpeed,
+        color: bulletColor,
       });
     }
   }
@@ -808,6 +1023,7 @@ function update() {
         if (l.harmful) {
           gameOver = true;
           gameOverTime = Date.now();
+          shipLog('=== game over (lost) ===');
         } else {
           // Collect blue lava
           createSplash(l.x, l.y);
@@ -920,7 +1136,9 @@ function drawLava() {
       ctx.fill();
       // Number on blue blob — as big as practicable while still fitting
       if (r > 5) {
-        const fontSize = Math.max(10, r * 1.6);
+        // Shrink to fit multi-digit numbers inside the blob
+        const len = String(l.value || '?').length;
+        const fontSize = Math.max(9, Math.min(r * 1.6, r * 3.1 / len));
         ctx.font = `bold ${fontSize}px monospace`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -1019,19 +1237,22 @@ function moveMenu(delta) {
 }
 
 function launchGame(i) {
+  gameMode = games[i].mode || 'classic';
   resetGame();
   state = 'playing';
+  shipLog('=== game start (' + gameMode + ') ===');
 }
 
 function backToMenu() {
   resetGame();
   state = 'menu';
+  shipLog('=== back to menu ===');
 }
 
 // ─── Draw bullets ────────────────────────────────
 function drawBullets() {
-  ctx.fillStyle = '#000';
   for (const b of bullets) {
+    ctx.fillStyle = b.color || bulletColor;
     ctx.fillRect(b.x - 2, b.y - 5, 4, 10);
   }
 }
@@ -1050,7 +1271,8 @@ function drawSplashes() {
 
 // ─── Draw power bar (dispatches to the selected layout) ─
 function drawPowerBar() {
-  if (cfg.uiLayout === 'side') drawPowerBarSide();
+  // Side layout draws one brick per unit — unusable with 4-digit targets
+  if (cfg.uiLayout === 'side' && gameMode !== 'ones') drawPowerBarSide();
   else drawPowerBarBottom();
 }
 
@@ -1298,15 +1520,92 @@ function draw() {
   if (gameOver) drawGameOver();
 }
 
+// ─── Focus pause ─────────────────────────────────
+// Safari freezes Gamepad API delivery whenever the page loses focus
+// (controller home/share button, notification banner, screenshot UI).
+// Pause instead of leaving the ship uncontrollable; a tap refocuses
+// the page, which restarts gamepad delivery.
+// Both conditions are debounced: some controller buttons (e.g. R1) can
+// blur the page or de-list the pad for just a frame or two, and reacting
+// instantly makes the overlays strobe. Blips are counted and logged to
+// the debug overlay instead so we can see which signal is flickering.
+let focusPaused = false, unfocusedSince = 0, focusBlips = 0, lastBlipLog = 0;
+function logBlips(label, n) {
+  if (Date.now() - lastBlipLog < 2000) return false;
+  showDebug(ts() + ' ' + label + ' blipped x' + n);
+  lastBlipLog = Date.now();
+  return true;
+}
+function updateFocusPause() {
+  if (document.hasFocus()) {
+    if (unfocusedSince && !focusPaused) {
+      focusBlips++;
+      if (logBlips('focus', focusBlips)) focusBlips = 0;
+    }
+    unfocusedSince = 0;
+    if (focusPaused) {
+      focusPaused = false;
+      showDebug(ts() + ' resumed: focus back');
+    }
+    return;
+  }
+  if (!unfocusedSince) unfocusedSince = Date.now();
+  if (!focusPaused && state !== 'menu' && !gameOver && Date.now() - unfocusedSince > 700) {
+    focusPaused = true;
+    showDebug(ts() + ' paused: page lost focus');
+  }
+}
+function drawFocusPause() {
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.fillRect(0, 0, W, H);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#c33';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('PAUSED — controller input interrupted', W / 2, H / 2 - 14);
+  ctx.fillStyle = '#333';
+  ctx.font = '16px monospace';
+  ctx.fillText('usually resumes by itself — tap the screen if it does not', W / 2, H / 2 + 18);
+}
+
+// Safari can drop the pad from getGamepads() entirely after focus loss
+// and only re-lists it once a controller button is pressed — tapping
+// the screen refocuses the page but is not enough on its own.
+let padSeen = false, padMissingSince = 0, padBlips = 0;
+function drawPadReconnectHint() {
+  if (getGamepad()) {
+    padSeen = true;
+    if (padMissingSince) {
+      padBlips++;
+      if (logBlips('pad', padBlips)) padBlips = 0;
+    }
+    padMissingSince = 0;
+    return;
+  }
+  if (!padSeen) return;
+  if (!padMissingSince) padMissingSince = Date.now();
+  if (Date.now() - padMissingSince < 400) return;
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.fillRect(W / 2 - 240, 8, 480, 30);
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#c33';
+  ctx.font = 'bold 14px monospace';
+  ctx.fillText('controller lost — press any button on it to reconnect', W / 2, 28);
+}
+
 function loop() {
   ctx.clearRect(0, 0, W, H);
+  updateFocusPause();
   if (state === 'menu') {
     drawMenu();
   } else {
-    if (!gameOver) update();
+    if (!gameOver && !focusPaused) update();
     draw();
+    if (focusPaused) drawFocusPause();
   }
-  handleGamepadInput();
+  if (!focusPaused) drawPadReconnectHint();
+  trackPressedButtons();
+  gamepadWatchdog();
+  if (!focusPaused) handleGamepadInput();
   requestAnimationFrame(loop);
 }
 
@@ -1349,6 +1648,9 @@ window.addEventListener('keydown', e => {
     if (e.code === 'ArrowLeft' || e.code === 'KeyA') moveMenu(-1);
     if (e.code === 'ArrowRight' || e.code === 'KeyD') moveMenu(1);
     if (isA) launchGame(menuIndex);
+  } else if (state === 'playing') {
+    // Press X to cycle bullet colour through strong rainbow colours.
+    if (e.code === 'KeyX') cycleBulletColor();
   } else if (gameOver) {
     if (isA && canRestart()) doRestart();
     if (isB && canRestart()) backToMenu();
@@ -1364,6 +1666,9 @@ function handleGamepadInput() {
         if (gpEdge(DPAD_LEFT)) moveMenu(-1);
         if (gpEdge(DPAD_RIGHT)) moveMenu(1);
         if (gpEdge(BTN_A)) launchGame(menuIndex);
+      } else if (state === 'playing') {
+        // Press X to cycle bullet colour through strong rainbow colours.
+        if (gpEdge(BTN_X)) cycleBulletColor();
       } else if (gameOver) {
         if (gpEdge(BTN_A) && canRestart()) doRestart();
         if (gpEdge(BTN_B) && canRestart()) backToMenu();

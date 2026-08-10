@@ -16,3 +16,9 @@ tunnel. A localhost server alone is useless to the player.
   every fresh start, so never quote an old URL from memory.
 - Game code lives in `game/` (single-file game in `game/index.html`);
   `infra/` is tunnel/tooling only — don't touch it for gameplay work.
+- **To see what happened during gameplay on the iPad:** run `./infra/logs.sh`.
+  It prints the logs of the most recent game (errors, controller dropouts,
+  game start/over). Run `./infra/logs.sh --live` to watch logs in real time
+  while a game is being played. Always use this script — do not read
+  `infra/client.log` directly. Log-line meanings are explained in the
+  "Getting logs from the iPad" section of `README.md`.
