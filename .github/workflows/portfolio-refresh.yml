@@ -1,0 +1,63 @@
+name: Refresh portfolio prices
+
+# Every 20 minutes through US market hours. The range is 13:00-21:59 UTC so it
+# covers 09:30-16:00 in New York under both EST (UTC-5) and EDT (UTC-4) without
+# needing to change when the US switches over.
+#
+# NOTE: GitHub only runs `schedule` triggers on the repository's DEFAULT branch.
+# This file has no effect until it is merged to the default branch.
+# GitHub also disables scheduled workflows in a repo with 60 days of no commit
+# activity; the refresh commits below keep it alive on their own.
+on:
+  schedule:
+    - cron: "*/20 13-21 * * 1-5"
+  workflow_dispatch:            # lets you force a refresh from the Actions tab
+
+permissions:
+  contents: write
+
+# Never let two refreshes race for the same commit.
+concurrency:
+  group: portfolio-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install --quiet yfinance
+
+      - name: Fetch prices
+        run: python3 scripts/fetch_prices.py
+
+      - name: Commit refreshed data
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/data.json
+          if git diff --cached --quiet; then
+            echo "No change in docs/data.json - nothing to commit."
+            exit 0
+          fi
+          git commit -m "Refresh portfolio prices [skip ci]"
+          # A concurrent run may have landed first; rebase onto it and retry.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected, rebasing and retrying..."
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
+            sleep $((attempt * 3))
+          done
+          echo "::error::Could not push refreshed data after 3 attempts."
+          exit 1

@@ -67,3 +67,26 @@ These write warnings into `notes` rather than failing the run:
 Known listing dates are declared in `TICKER_INFO`; the script derives what
 data actually exists from the series itself rather than assuming, so the
 labels stay correct as the run date moves.
+
+## fetch_prices.py
+
+Refreshes the live dashboard in `docs/`. Pulls the intraday price, previous
+close and ~7 months of adjusted daily closes for all 42 holdings, plus the
+USD/NZD rate, and writes `docs/data.json`.
+
+```bash
+pip install yfinance
+python3 scripts/fetch_prices.py               # one refresh
+python3 scripts/fetch_prices.py --watch 900   # refresh every 15 minutes
+```
+
+See [`docs/README.md`](../docs/README.md) for the dashboard, deployment, and how
+to edit the watchlists.
+
+Holdings, watchlists and corporate-action context are declared in the
+configuration block at the top of the script. History is fetched for all
+tickers in one batched request (with per-ticker retry for anything the batch
+misses) to stay well clear of Yahoo's rate limits at a 20-minute cadence.
+
+This supersedes `portfolio_price_history.py` for day-to-day use; that script is
+kept because it still produces the one-off CSV and drawdown chart.
