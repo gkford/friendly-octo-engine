@@ -6,3 +6,7 @@ client.log.1
 nohup.out
 LINKS.md
 game-starter-QR.png
+__pycache__/
+*.pyc
+portfolio_price_history.csv
+portfolio_drawdown.png
