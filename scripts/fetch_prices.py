@@ -39,18 +39,88 @@ import pandas as pd
 # Configuration -- edit these, not the logic below
 # ---------------------------------------------------------------------------
 
-# (ticker, shares). Order here is only the tie-break order; the dashboard sorts.
-HOLDINGS: list[tuple[str, float]] = [
-    ("NVDA", 31.2714), ("MSFT", 11.9168), ("MRNA", 32.8788), ("AMZN", 14.9084),
-    ("AAPL", 8), ("RKLB", 39.0632), ("GOOG", 6), ("GLW", 13.7832), ("MELI", 1),
-    ("ASML", 1), ("VRTX", 3), ("KARO", 22), ("MOG.A", 4.0076), ("GOOGL", 4.1315),
-    ("TMDX", 16), ("KRYS", 4), ("TSLA", 3.7752), ("MDT", 14), ("NU", 90),
-    ("FPS", 40), ("SHOP", 9), ("OC", 9), ("TKO", 6), ("MRVL", 5), ("CDNS", 4),
-    ("PLD", 8), ("META", 1.5251), ("SYM", 24), ("AVGO", 3), ("SBGSY", 16),
-    ("UTHR", 2), ("IBM", 4), ("INTC", 10), ("MLI", 16), ("RDDT", 6), ("KBR", 25),
-    ("NBIS", 4.2786), ("WRBY", 35), ("CBRS", 4.1645), ("BWXT", 5), ("HON", 2),
-    ("HONA", 2),
-]
+# Owners, in the order their views appear in the dashboard's toggle.
+OWNERS: list[str] = ["Graeme", "Tessa"]
+
+# Which view the dashboard opens on: an owner name, or "Combined".
+DEFAULT_VIEW = "Graeme"
+
+# Placeholder owner for holdings whose per-owner split has not been supplied.
+# While any holding still carries this, the dashboard can only show Combined.
+UNATTRIBUTED = "Unattributed"
+
+# Shares by owner, one entry per ticker.
+#
+#     "AMZN": {"Graeme": 14.9084},              held by Graeme only
+#     "GLW":  {"Tessa": 13.7832},               held by Tessa only
+#     "NVDA": {"Graeme": 20.0, "Tessa": 11.2714},   held by both
+#
+# A ticker held by both carries BOTH entries and stays a single row: the
+# Combined view sums the entries, so a jointly held position is counted once
+# at its full size -- never dropped, never counted twice. That is the whole
+# reason the split lives here rather than in two separate lists.
+#
+# The counts below come from the original 42-line brief, which was already a
+# merge of Graeme's Sharesies holdings and Tessa's spreadsheet with no record
+# of which came from where. They are therefore parked under UNATTRIBUTED
+# rather than guessed at. Replace each one with the real split.
+HOLDINGS: dict[str, dict[str, float]] = {
+    "NVDA":  {UNATTRIBUTED: 31.2714},
+    "MSFT":  {UNATTRIBUTED: 11.9168},
+    "MRNA":  {UNATTRIBUTED: 32.8788},
+    "AMZN":  {UNATTRIBUTED: 14.9084},
+    "AAPL":  {UNATTRIBUTED: 8},
+    "RKLB":  {UNATTRIBUTED: 39.0632},
+    "GOOG":  {UNATTRIBUTED: 6},
+    "GLW":   {UNATTRIBUTED: 13.7832},
+    "MELI":  {UNATTRIBUTED: 1},
+    "ASML":  {UNATTRIBUTED: 1},
+    "VRTX":  {UNATTRIBUTED: 3},
+    "KARO":  {UNATTRIBUTED: 22},
+    "MOG.A": {UNATTRIBUTED: 4.0076},
+    "GOOGL": {UNATTRIBUTED: 4.1315},
+    "TMDX":  {UNATTRIBUTED: 16},
+    "KRYS":  {UNATTRIBUTED: 4},
+    "TSLA":  {UNATTRIBUTED: 3.7752},
+    "MDT":   {UNATTRIBUTED: 14},
+    "NU":    {UNATTRIBUTED: 90},
+    "FPS":   {UNATTRIBUTED: 40},
+    "SHOP":  {UNATTRIBUTED: 9},
+    "OC":    {UNATTRIBUTED: 9},
+    "TKO":   {UNATTRIBUTED: 6},
+    "MRVL":  {UNATTRIBUTED: 5},
+    "CDNS":  {UNATTRIBUTED: 4},
+    "PLD":   {UNATTRIBUTED: 8},
+    "META":  {UNATTRIBUTED: 1.5251},
+    "SYM":   {UNATTRIBUTED: 24},
+    "AVGO":  {UNATTRIBUTED: 3},
+    "SBGSY": {UNATTRIBUTED: 16},
+    "UTHR":  {UNATTRIBUTED: 2},
+    "IBM":   {UNATTRIBUTED: 4},
+    "INTC":  {UNATTRIBUTED: 10},
+    "MLI":   {UNATTRIBUTED: 16},
+    "RDDT":  {UNATTRIBUTED: 6},
+    "KBR":   {UNATTRIBUTED: 25},
+    "NBIS":  {UNATTRIBUTED: 4.2786},
+    "WRBY":  {UNATTRIBUTED: 35},
+    "CBRS":  {UNATTRIBUTED: 4.1645},
+    "BWXT":  {UNATTRIBUTED: 5},
+    "HON":   {UNATTRIBUTED: 2},
+    "HONA":  {UNATTRIBUTED: 2},
+}
+
+
+def split_is_supplied() -> bool:
+    """True once every holding is attributed to real owners.
+
+    The dashboard refuses to show a per-owner view while this is False, rather
+    than presenting a total that silently omits or duplicates somebody's shares.
+    """
+    return all(
+        owner_shares and all(o != UNATTRIBUTED for o in owner_shares)
+        for owner_shares in HOLDINGS.values()
+    )
+
 
 # Who rates what as a good buy. This is a view on the stock, not a record of
 # who owns or watches it. Add names or tickers freely -- a ticker appearing in
@@ -369,7 +439,7 @@ def resolve_good_buys() -> dict[str, str]:
             for t, people in counts.items()}
 
 
-def build_position(ticker: str, shares: float, symbol: str,
+def build_position(ticker: str, owner_shares: dict[str, float], symbol: str,
                    close: "pd.Series", quote: dict, name: str | None) -> dict:
     """Assemble one dashboard row. Missing values are null, never estimated."""
     info = TICKER_INFO.get(ticker, TickerInfo())
@@ -399,7 +469,11 @@ def build_position(ticker: str, shares: float, symbol: str,
         "ticker": ticker,
         "symbol_used": symbol,
         "name": name or FALLBACK_NAMES.get(ticker) or ticker,
-        "shares": shares,
+        # `shares` is the combined position; `shares_by_owner` is how it splits.
+        # A jointly held ticker sums here and stays one row, so the combined
+        # view counts it once at full size.
+        "shares": round(sum(owner_shares.values()), 6),
+        "shares_by_owner": dict(owner_shares),
         "price": round(price, 2),
         "price_source": price_source,
         "price_as_of": price_as_of,
@@ -474,9 +548,18 @@ def build_position(ticker: str, shares: float, symbol: str,
     return row
 
 
-def carry_forward(previous: dict, reason: str) -> dict:
-    """Keep a failed ticker's last-known-good row rather than blanking it."""
+def carry_forward(previous: dict, reason: str,
+                  owner_shares: dict[str, float] | None = None) -> dict:
+    """Keep a failed ticker's last-known-good row rather than blanking it.
+
+    Prices carry forward; share counts do not. If the config's split changed
+    since the last good fetch, the new split wins -- a stale price against a
+    current holding, never a stale holding.
+    """
     row = dict(previous)
+    if owner_shares is not None:
+        row["shares"] = round(sum(owner_shares.values()), 6)
+        row["shares_by_owner"] = dict(owner_shares)
     row["stale"] = True
     row["stale_reason"] = reason
     notes = [n for n in row.get("notes", []) if not n.startswith("Stale:")]
@@ -546,7 +629,7 @@ def refresh(path: str, delay: float) -> dict:
     # Resolve each holding to a working yfinance symbol, reusing whatever the
     # last run proved worked so dotted tickers are not re-probed every 15 min.
     wanted: dict[str, str] = {}
-    for ticker, _shares in HOLDINGS:
+    for ticker in HOLDINGS:
         cached = prev_rows.get(ticker, {}).get("symbol_used")
         wanted[ticker] = cached if cached else symbol_candidates(ticker)[0]
 
@@ -555,7 +638,7 @@ def refresh(path: str, delay: float) -> dict:
     positions: list[dict] = []
     failures: list[str] = []
 
-    for ticker, shares in HOLDINGS:
+    for ticker, owner_shares in HOLDINGS.items():
         close = history.get(wanted[ticker])
         symbol = wanted[ticker]
 
@@ -573,12 +656,15 @@ def refresh(path: str, delay: float) -> dict:
             log.error("%s: %s", ticker, reason)
             failures.append(ticker)
             if ticker in prev_rows:
-                positions.append(carry_forward(prev_rows[ticker], reason))
+                positions.append(carry_forward(prev_rows[ticker], reason, owner_shares))
             else:
                 positions.append({
                     "ticker": ticker, "symbol_used": symbol,
-                    "name": FALLBACK_NAMES.get(ticker, ticker), "shares": shares,
+                    "name": FALLBACK_NAMES.get(ticker, ticker),
+                    "shares": round(sum(owner_shares.values()), 6),
+                    "shares_by_owner": dict(owner_shares),
                     "price": None, "stale": True, "stale_reason": reason,
+                    "good_buy": good_buys.get(ticker),
                     "notes": [f"Never fetched successfully: {reason}"],
                 })
             continue
@@ -589,13 +675,15 @@ def refresh(path: str, delay: float) -> dict:
             name = fetch_name(symbol) or FALLBACK_NAMES.get(ticker)
 
         try:
-            row = build_position(ticker, shares, symbol, close, quote, name)
+            row = build_position(ticker, owner_shares, symbol, close, quote, name)
         except Exception as exc:                            # noqa: BLE001
             log.exception("%s: row build failed", ticker)
             failures.append(ticker)
             positions.append(carry_forward(prev_rows.get(ticker, {
                 "ticker": ticker, "name": FALLBACK_NAMES.get(ticker, ticker),
-                "shares": shares, "notes": []}), f"calculation error: {exc}"))
+                "shares": round(sum(owner_shares.values()), 6),
+                "shares_by_owner": dict(owner_shares), "notes": []}),
+                f"calculation error: {exc}"))
             continue
 
         row["good_buy"] = good_buys.get(ticker)
@@ -608,6 +696,10 @@ def refresh(path: str, delay: float) -> dict:
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "duration_seconds": round((datetime.now(timezone.utc) - started).total_seconds(), 1),
         "fx": fx,
+        "owners": OWNERS,
+        "default_view": DEFAULT_VIEW,
+        "split_supplied": split_is_supplied(),
+        "unattributed_label": UNATTRIBUTED,
         "good_buys": GOOD_BUYS,
         "failures": failures,
         "positions": positions,

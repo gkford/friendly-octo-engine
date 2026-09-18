@@ -65,6 +65,50 @@ and `*/20 13-21 * * 1-5` covers 09:30–16:00 New York under both EST and EDT.
 Tightening it to `*/15` is fine; each run takes about a minute, and Actions
 minutes are free on public repositories.
 
+## Whose portfolio: the view toggle
+
+The toggle above the table switches between **Graeme's**, **Tessa's** and
+**Combined**. Graeme's is the default (`DEFAULT_VIEW` in
+`scripts/fetch_prices.py`); the last choice made in a browser is remembered
+there.
+
+Everything downstream follows the toggle: which rows appear, the shares and
+value columns, the totals row, and the stat cards.
+
+### How combining works
+
+Shares are stored per owner, one entry per person, on a single row per ticker:
+
+```python
+HOLDINGS = {
+    "AMZN": {"Graeme": 14.9084},                    # Graeme only
+    "GLW":  {"Tessa": 13.7832},                     # Tessa only
+    "NVDA": {"Graeme": 20.0, "Tessa": 11.2714},     # both
+}
+```
+
+A ticker you both hold stays **one row**. The Combined view sums the entries,
+so that position is counted once at its full size — it is not dropped, and it
+does not appear twice. Combined total always equals Graeme's total plus
+Tessa's, which the test suite asserts directly. In the Combined view, a jointly
+held row shows its split under the share count (`G 20 · T 11.2714`) so the
+arithmetic is checkable at a glance.
+
+### The split has not been supplied yet
+
+`HOLDINGS` currently attributes every position to `UNATTRIBUTED`, because the
+original 42-line brief was already a merge of the two sources with no record of
+which line came from where. While that is true:
+
+- `split_is_supplied()` returns `False`
+- the per-owner toggle buttons are **disabled**
+- the page shows Combined only, with a banner explaining why
+
+That is deliberate. Guessing the split would produce a per-owner total that
+silently omits or duplicates somebody's shares, which is worse than not
+offering the view. Fill in the real per-owner numbers and the toggle enables
+itself — no other change needed.
+
 ## Editing the good-buy ratings
 
 These tags record **who rates a holding as a good buy**. They say nothing about

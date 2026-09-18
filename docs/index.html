@@ -120,6 +120,21 @@ h1 { font-size: 20px; font-weight: 650; letter-spacing: -0.01em; margin: 0; }
 .card .meta { font-size: 13px; color: var(--ink-2); margin-top: 4px; }
 .card .meta strong { color: var(--ink); font-weight: 620; }
 
+/* ----- view toggle (whose portfolio) ------------------------------------ */
+.viewbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin-bottom: 12px; }
+.seg { display: inline-flex; background: var(--surface); border: 1px solid var(--ring);
+       border-radius: 9px; padding: 3px; gap: 3px; }
+.seg button {
+  font: inherit; font-size: 13px; font-weight: 600; color: var(--ink-2);
+  background: none; border: 0; border-radius: 6px; padding: 5px 14px; cursor: pointer;
+  white-space: nowrap; transition: background 120ms ease, color 120ms ease;
+}
+.seg button:hover:not(:disabled):not([aria-pressed="true"]) { color: var(--ink); background: var(--surface-alt); }
+.seg button[aria-pressed="true"] { background: var(--cat-tessa); color: #fff; }
+.seg button:disabled { opacity: 0.4; cursor: not-allowed; }
+.seg button:focus-visible { outline: 2px solid var(--cat-tessa); outline-offset: 2px; }
+.viewnote { font-size: 12.5px; color: var(--ink-muted); }
+
 /* ----- legend ----------------------------------------------------------- */
 .legend {
   display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
@@ -260,6 +275,11 @@ footer button {
 
   <section class="stats" id="stats" aria-label="Portfolio summary"></section>
 
+  <div class="viewbar">
+    <div class="seg" id="viewseg" role="group" aria-label="Whose portfolio to show"></div>
+    <span class="viewnote" id="viewnote"></span>
+  </div>
+
   <div class="legend">
     <span class="who">Rated a good buy by:</span>
     <span class="legend-item"><span class="swatch tessa"></span>Tessa</span>
@@ -304,10 +324,33 @@ function pctCell(v) {
 }
 
 let DATA = null;
+let VIEW = null;               /* an owner name, or "Combined" */
 let sortKey = "drawdown_pct";
 let sortDir = 1;               /* 1 = ascending; drawdown ascending = worst first */
 
-const valueUsd = p => (p.price == null ? null : p.price * p.shares);
+const COMBINED = "Combined";
+const splitReady = () => !!(DATA && DATA.split_supplied);
+const owners = () => (DATA && DATA.owners) || [];
+
+/* Shares for the active view. Combined sums every owner's entry, so a ticker
+   both of them hold is counted once at its full size -- not dropped, and not
+   counted twice by appearing as two rows. */
+function sharesFor(p) {
+  const by = p.shares_by_owner || {};
+  if (VIEW === COMBINED) {
+    return Object.values(by).reduce((a, b) => a + (Number(b) || 0), 0);
+  }
+  return Number(by[VIEW]) || 0;
+}
+
+function ownerBreakdown(p) {
+  const by = p.shares_by_owner || {};
+  const parts = owners().filter(o => Number(by[o]) > 0)
+    .map(o => `${o[0]} ${Number(by[o]).toLocaleString("en-US", {maximumFractionDigits: 4})}`);
+  return parts.length > 1 ? parts.join(" · ") : "";
+}
+
+const valueUsd = p => (p.price == null ? null : p.price * sharesFor(p));
 const valueNzd = p => {
   const u = valueUsd(p), fx = DATA && DATA.fx && DATA.fx.usd_nzd;
   return (u == null || !fx) ? null : u * fx;
@@ -321,8 +364,12 @@ const COLUMNS = [
      `<span class="sub2 onlynarrow">${esc(p.name || "")}</span>`},
   {key: "name", label: "Company", cls: "l c-name", get: p => p.name || "",
    render: p => `<div class="name" title="${esc(p.name || "")}">${esc(p.name || "—")}</div>`},
-  {key: "shares", label: "Shares", cls: "num", get: p => p.shares,
-   render: p => p.shares.toLocaleString("en-US", {maximumFractionDigits: 4})},
+  {key: "shares", label: "Shares", cls: "num", get: p => sharesFor(p),
+   render: p => {
+     const n = sharesFor(p).toLocaleString("en-US", {maximumFractionDigits: 4});
+     const split = VIEW === COMBINED ? ownerBreakdown(p) : "";
+     return split ? `${n}<span class="sub2">${esc(split)}</span>` : n;
+   }},
   {key: "price", label: "Price", cls: "num", get: p => p.price,
    render: p => p.price == null ? '<span class="na">N/A</span>'
      : `${fmtUsd(p.price)}<span class="sub2">${priceAsOf(p)}</span>`},
@@ -429,8 +476,10 @@ function renderHead() {
 
 function render() {
   if (!DATA) return;
+  renderViewToggle();
   renderHead();
-  const rows = sortRows(DATA.positions || []);
+  /* Only positions the active view actually holds. */
+  const rows = sortRows((DATA.positions || []).filter(p => sharesFor(p) > 0));
 
   document.getElementById("tbody").innerHTML = rows.map(p => {
     const cls = p.good_buy ? p.good_buy.toLowerCase() : "";
@@ -457,6 +506,48 @@ function render() {
     `<td></td></tr>`;
 
   renderStats(rows, totUsd, fx);
+
+  const f = DATA.fx || {};
+  document.getElementById("subline").textContent =
+    `${rows.length} holdings · Yahoo Finance via yfinance` +
+    (f.usd_nzd ? ` · 1 USD = ${f.usd_nzd.toFixed(4)} NZD` : "");
+}
+
+function renderViewToggle() {
+  const choices = [...owners(), COMBINED];
+  const ready = splitReady();
+  document.getElementById("viewseg").innerHTML = choices.map(c => {
+    /* Without a per-owner split there is no honest way to show one owner's
+       slice, so those buttons are disabled rather than showing a wrong total. */
+    const off = !ready && c !== COMBINED;
+    return `<button type="button" data-view="${esc(c)}" aria-pressed="${c === VIEW}"` +
+           (off ? ` disabled title="Per-owner split not supplied yet"` : "") +
+           `>${esc(c === COMBINED ? "Combined" : c + "'s")}</button>`;
+  }).join("");
+  document.querySelectorAll("#viewseg button").forEach(b => {
+    b.addEventListener("click", () => {
+      VIEW = b.dataset.view;
+      try { localStorage.setItem("portfolioView", VIEW); } catch (e) { /* private mode */ }
+      render();
+    });
+  });
+  const note = document.getElementById("viewnote");
+  note.textContent = ready
+    ? (VIEW === COMBINED
+        ? "Both holdings summed; a ticker you both hold is one row, counted once."
+        : `Only ${VIEW}'s shares.`)
+    : "Per-owner split not supplied - showing combined only.";
+}
+
+/* Pick the opening view: the configured default when the split allows it,
+   otherwise Combined. A remembered choice wins if it is still valid. */
+function resolveView() {
+  if (!splitReady()) { VIEW = COMBINED; return; }
+  let stored = null;
+  try { stored = localStorage.getItem("portfolioView"); } catch (e) { /* private mode */ }
+  const valid = [...owners(), COMBINED];
+  if (stored && valid.includes(stored)) { VIEW = stored; return; }
+  VIEW = valid.includes(DATA.default_view) ? DATA.default_view : COMBINED;
 }
 
 function best(rows, key, dir) {
@@ -522,6 +613,13 @@ function paintBanner() {
     msgs.push(`${DATA.failures.length} ticker(s) failed to refresh and are showing ` +
               `last-known-good values: <strong>${DATA.failures.map(esc).join(", ")}</strong>.`);
   }
+  if (!splitReady()) {
+    const label = DATA.unattributed_label || "Unattributed";
+    msgs.push(`Holdings are not split between ${esc(owners().join(" and "))} yet ` +
+              `(all ${(DATA.positions || []).length} are <code>${esc(label)}</code>), so only the ` +
+              `combined view is available. Fill in <code>HOLDINGS</code> in ` +
+              `<code>scripts/fetch_prices.py</code> to enable the per-owner views.`);
+  }
   if (DATA.fx && DATA.fx.stale) {
     msgs.push(`FX rate is stale: ${esc(DATA.fx.note || "last known rate in use")}.`);
   }
@@ -542,13 +640,11 @@ async function load(initial) {
     const res = await fetch("data.json?t=" + Date.now(), {cache: "no-store"});
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     DATA = await res.json();
+    if (VIEW === null) resolveView();
+    if (!splitReady()) VIEW = COMBINED;
     render();
     paintStatus();
     paintBanner();
-    const f = DATA.fx || {};
-    document.getElementById("subline").textContent =
-      `${(DATA.positions || []).length} holdings · Yahoo Finance via yfinance` +
-      (f.usd_nzd ? ` · 1 USD = ${f.usd_nzd.toFixed(4)} NZD` : "");
     document.getElementById("foot").textContent =
       `Refresh took ${DATA.duration_seconds ?? "?"}s. This page re-reads data.json every 60 seconds; ` +
       `the data itself is refreshed by the scheduled fetch job. Prices are split/dividend adjusted. ` +

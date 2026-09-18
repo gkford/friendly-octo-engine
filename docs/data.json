@@ -7,6 +7,13 @@
   "stale": true,
   "note": "Awaiting first refresh"
  },
+ "owners": [
+  "Graeme",
+  "Tessa"
+ ],
+ "default_view": "Graeme",
+ "split_supplied": false,
+ "unattributed_label": "Unattributed",
  "good_buys": {
   "Tessa": [
    "AMZN",
@@ -29,6 +36,9 @@
    "symbol_used": "NVDA",
    "name": "NVIDIA Corp",
    "shares": 31.2714,
+   "shares_by_owner": {
+    "Unattributed": 31.2714
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -55,6 +65,9 @@
    "symbol_used": "MSFT",
    "name": "Microsoft Corp",
    "shares": 11.9168,
+   "shares_by_owner": {
+    "Unattributed": 11.9168
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -81,6 +94,9 @@
    "symbol_used": "MRNA",
    "name": "Moderna Inc",
    "shares": 32.8788,
+   "shares_by_owner": {
+    "Unattributed": 32.8788
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -107,6 +123,9 @@
    "symbol_used": "AMZN",
    "name": "Amazon.com Inc",
    "shares": 14.9084,
+   "shares_by_owner": {
+    "Unattributed": 14.9084
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -133,6 +152,9 @@
    "symbol_used": "AAPL",
    "name": "Apple Inc",
    "shares": 8,
+   "shares_by_owner": {
+    "Unattributed": 8
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -159,6 +181,9 @@
    "symbol_used": "RKLB",
    "name": "Rocket Lab Corp",
    "shares": 39.0632,
+   "shares_by_owner": {
+    "Unattributed": 39.0632
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -185,6 +210,9 @@
    "symbol_used": "GOOG",
    "name": "Alphabet Inc Class C",
    "shares": 6,
+   "shares_by_owner": {
+    "Unattributed": 6
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -211,6 +239,9 @@
    "symbol_used": "GLW",
    "name": "Corning Inc",
    "shares": 13.7832,
+   "shares_by_owner": {
+    "Unattributed": 13.7832
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -237,6 +268,9 @@
    "symbol_used": "MELI",
    "name": "MercadoLibre Inc",
    "shares": 1,
+   "shares_by_owner": {
+    "Unattributed": 1
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -263,6 +297,9 @@
    "symbol_used": "ASML",
    "name": "ASML Holding NV",
    "shares": 1,
+   "shares_by_owner": {
+    "Unattributed": 1
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -289,6 +326,9 @@
    "symbol_used": "VRTX",
    "name": "Vertex Pharmaceuticals",
    "shares": 3,
+   "shares_by_owner": {
+    "Unattributed": 3
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -315,6 +355,9 @@
    "symbol_used": "KARO",
    "name": "Karooooo Ltd",
    "shares": 22,
+   "shares_by_owner": {
+    "Unattributed": 22
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -341,6 +384,9 @@
    "symbol_used": "MOG.A",
    "name": "Moog Inc Class A",
    "shares": 4.0076,
+   "shares_by_owner": {
+    "Unattributed": 4.0076
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -367,6 +413,9 @@
    "symbol_used": "GOOGL",
    "name": "Alphabet Inc Class A",
    "shares": 4.1315,
+   "shares_by_owner": {
+    "Unattributed": 4.1315
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -393,6 +442,9 @@
    "symbol_used": "TMDX",
    "name": "TransMedics Group",
    "shares": 16,
+   "shares_by_owner": {
+    "Unattributed": 16
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -419,6 +471,9 @@
    "symbol_used": "KRYS",
    "name": "Krystal Biotech Inc",
    "shares": 4,
+   "shares_by_owner": {
+    "Unattributed": 4
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -445,6 +500,9 @@
    "symbol_used": "TSLA",
    "name": "Tesla Inc",
    "shares": 3.7752,
+   "shares_by_owner": {
+    "Unattributed": 3.7752
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -471,6 +529,9 @@
    "symbol_used": "MDT",
    "name": "Medtronic plc",
    "shares": 14,
+   "shares_by_owner": {
+    "Unattributed": 14
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -497,6 +558,9 @@
    "symbol_used": "NU",
    "name": "Nu Holdings Ltd",
    "shares": 90,
+   "shares_by_owner": {
+    "Unattributed": 90
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -523,6 +587,9 @@
    "symbol_used": "FPS",
    "name": "Forgent Power Solutions Inc",
    "shares": 40,
+   "shares_by_owner": {
+    "Unattributed": 40
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -549,6 +616,9 @@
    "symbol_used": "SHOP",
    "name": "Shopify Inc",
    "shares": 9,
+   "shares_by_owner": {
+    "Unattributed": 9
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -575,6 +645,9 @@
    "symbol_used": "OC",
    "name": "Owens Corning",
    "shares": 9,
+   "shares_by_owner": {
+    "Unattributed": 9
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -601,6 +674,9 @@
    "symbol_used": "TKO",
    "name": "TKO Group Holdings",
    "shares": 6,
+   "shares_by_owner": {
+    "Unattributed": 6
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -627,6 +703,9 @@
    "symbol_used": "MRVL",
    "name": "Marvell Technology",
    "shares": 5,
+   "shares_by_owner": {
+    "Unattributed": 5
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -653,6 +732,9 @@
    "symbol_used": "CDNS",
    "name": "Cadence Design Systems",
    "shares": 4,
+   "shares_by_owner": {
+    "Unattributed": 4
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -679,6 +761,9 @@
    "symbol_used": "PLD",
    "name": "Prologis Inc",
    "shares": 8,
+   "shares_by_owner": {
+    "Unattributed": 8
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -705,6 +790,9 @@
    "symbol_used": "META",
    "name": "Meta Platforms Inc",
    "shares": 1.5251,
+   "shares_by_owner": {
+    "Unattributed": 1.5251
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -731,6 +819,9 @@
    "symbol_used": "SYM",
    "name": "Symbotic Inc",
    "shares": 24,
+   "shares_by_owner": {
+    "Unattributed": 24
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -757,6 +848,9 @@
    "symbol_used": "AVGO",
    "name": "Broadcom Inc",
    "shares": 3,
+   "shares_by_owner": {
+    "Unattributed": 3
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -783,6 +877,9 @@
    "symbol_used": "SBGSY",
    "name": "Schneider Electric SE (ADR)",
    "shares": 16,
+   "shares_by_owner": {
+    "Unattributed": 16
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -809,6 +906,9 @@
    "symbol_used": "UTHR",
    "name": "United Therapeutics",
    "shares": 2,
+   "shares_by_owner": {
+    "Unattributed": 2
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -835,6 +935,9 @@
    "symbol_used": "IBM",
    "name": "International Business Machines",
    "shares": 4,
+   "shares_by_owner": {
+    "Unattributed": 4
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -861,6 +964,9 @@
    "symbol_used": "INTC",
    "name": "Intel Corp",
    "shares": 10,
+   "shares_by_owner": {
+    "Unattributed": 10
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -887,6 +993,9 @@
    "symbol_used": "MLI",
    "name": "Mueller Industries Inc",
    "shares": 16,
+   "shares_by_owner": {
+    "Unattributed": 16
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -913,6 +1022,9 @@
    "symbol_used": "RDDT",
    "name": "Reddit Inc",
    "shares": 6,
+   "shares_by_owner": {
+    "Unattributed": 6
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -939,6 +1051,9 @@
    "symbol_used": "KBR",
    "name": "KBR Inc",
    "shares": 25,
+   "shares_by_owner": {
+    "Unattributed": 25
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -965,6 +1080,9 @@
    "symbol_used": "NBIS",
    "name": "Nebius Group NV",
    "shares": 4.2786,
+   "shares_by_owner": {
+    "Unattributed": 4.2786
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -991,6 +1109,9 @@
    "symbol_used": "WRBY",
    "name": "Warby Parker Inc",
    "shares": 35,
+   "shares_by_owner": {
+    "Unattributed": 35
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -1017,6 +1138,9 @@
    "symbol_used": "CBRS",
    "name": "Cerebras Systems Inc",
    "shares": 4.1645,
+   "shares_by_owner": {
+    "Unattributed": 4.1645
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -1043,6 +1167,9 @@
    "symbol_used": "BWXT",
    "name": "BWX Technologies Inc",
    "shares": 5,
+   "shares_by_owner": {
+    "Unattributed": 5
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -1069,6 +1196,9 @@
    "symbol_used": "HON",
    "name": "Honeywell International Inc",
    "shares": 2,
+   "shares_by_owner": {
+    "Unattributed": 2
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
@@ -1095,6 +1225,9 @@
    "symbol_used": "HONA",
    "name": "Honeywell Aerospace Inc",
    "shares": 2,
+   "shares_by_owner": {
+    "Unattributed": 2
+   },
    "price": null,
    "price_source": null,
    "price_as_of": null,
