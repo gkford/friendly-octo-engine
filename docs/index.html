@@ -11,7 +11,7 @@
    Tokens. Roles, not raw hex, are used throughout the body, so light/dark swap
    in one place. Dark values are declared under both the OS media query and the
    data-theme scope so a manual toggle wins either way.
-   Categorical slots 1-3 (blue/orange/aqua) carry the watcher tags: that triple
+   Categorical slots 1-3 (blue/orange/aqua) carry the good-buy tags: that triple
    passes the all-pairs CVD, normal-vision and contrast checks in both modes.
    Every tag also carries a text label, so identity is never colour-alone.
 --------------------------------------------------------------------------- */
@@ -261,11 +261,11 @@ footer button {
   <section class="stats" id="stats" aria-label="Portfolio summary"></section>
 
   <div class="legend">
-    <span class="who">Watching:</span>
+    <span class="who">Rated a good buy by:</span>
     <span class="legend-item"><span class="swatch tessa"></span>Tessa</span>
     <span class="legend-item"><span class="swatch graeme"></span>Graeme</span>
     <span class="legend-item"><span class="swatch both"></span>Both</span>
-    <span class="legend-item na">Unshaded rows are not on either watchlist.</span>
+    <span class="legend-item na">Unshaded rows are not currently rated a good buy by either.</span>
   </div>
 
   <div class="tablecard">
@@ -316,7 +316,7 @@ const valueNzd = p => {
 const COLUMNS = [
   {key: "ticker", label: "Ticker", cls: "l c-ticker", get: p => p.ticker,
    render: p => `<span class="tk">${esc(p.ticker)}</span>` +
-     (p.watcher ? `<span class="tag ${p.watcher.toLowerCase()}">${p.watcher}</span>` : "") +
+     (p.good_buy ? `<span class="tag ${p.good_buy.toLowerCase()}">${p.good_buy}</span>` : "") +
      flagGlyph(p) +
      `<span class="sub2 onlynarrow">${esc(p.name || "")}</span>`},
   {key: "name", label: "Company", cls: "l c-name", get: p => p.name || "",
@@ -433,7 +433,7 @@ function render() {
   const rows = sortRows(DATA.positions || []);
 
   document.getElementById("tbody").innerHTML = rows.map(p => {
-    const cls = p.watcher ? p.watcher.toLowerCase() : "";
+    const cls = p.good_buy ? p.good_buy.toLowerCase() : "";
     return `<tr class="${cls}">` +
       COLUMNS.map(c => `<td class="${c.cls}">${c.render(p)}</td>`).join("") + "</tr>";
   }).join("");

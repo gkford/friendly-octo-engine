@@ -65,12 +65,15 @@ and `*/20 13-21 * * 1-5` covers 09:30–16:00 New York under both EST and EDT.
 Tightening it to `*/15` is fine; each run takes about a minute, and Actions
 minutes are free on public repositories.
 
-## Editing the watchlists
+## Editing the good-buy ratings
 
-`WATCHERS` at the top of `scripts/fetch_prices.py`:
+These tags record **who rates a holding as a good buy**. They say nothing about
+who owns it or who is watching it — every position in the table is held.
+
+`GOOD_BUYS` at the top of `scripts/fetch_prices.py`:
 
 ```python
-WATCHERS = {
+GOOD_BUYS = {
     "Tessa":  ["AMZN", "GLW", "MRVL", "INTC", "KBR", "HON", "RKLB"],
     "Graeme": ["RKLB", "NBIS"],
 }
@@ -83,7 +86,7 @@ the `--cat-*` tokens, which explains why those three hues were chosen.
 
 ## What the colours mean
 
-- Row shading and the ticker chip: whose watchlist a holding is on
+- Row shading and the ticker chip: who rates that holding a good buy
   (Tessa / Graeme / Both). Every shaded row also carries a text chip, so the
   colour is never the only signal.
 - Green and red: gains and losses, on every percentage and on the drawdown bar.
@@ -91,7 +94,7 @@ the `--cat-*` tokens, which explains why those three hues were chosen.
 - An amber `!` beside a ticker means that row has a flag in its Notes column —
   a stale carry-forward, a missing look-back, or a corporate action to verify.
 
-The three watchlist hues were validated for colour-blind separation and contrast
+The three rating hues were validated for colour-blind separation and contrast
 in both light and dark themes; substituting them casually will break that.
 
 ## Reliability behaviour

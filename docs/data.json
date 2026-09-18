@@ -7,7 +7,7 @@
   "stale": true,
   "note": "Awaiting first refresh"
  },
- "watchers": {
+ "good_buys": {
   "Tessa": [
    "AMZN",
    "GLW",
@@ -44,7 +44,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -70,7 +70,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -96,7 +96,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -122,7 +122,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Tessa",
+   "good_buy": "Tessa",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -148,7 +148,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -174,7 +174,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Both",
+   "good_buy": "Both",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -200,7 +200,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -226,7 +226,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Tessa",
+   "good_buy": "Tessa",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -252,7 +252,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -278,7 +278,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -304,7 +304,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -330,7 +330,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -356,7 +356,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -382,7 +382,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -408,7 +408,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -434,7 +434,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -460,7 +460,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -486,7 +486,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -512,7 +512,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -538,7 +538,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -564,7 +564,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -590,7 +590,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -616,7 +616,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -642,7 +642,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Tessa",
+   "good_buy": "Tessa",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -668,7 +668,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -694,7 +694,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -720,7 +720,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -746,7 +746,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -772,7 +772,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -798,7 +798,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -824,7 +824,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -850,7 +850,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -876,7 +876,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Tessa",
+   "good_buy": "Tessa",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -902,7 +902,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -928,7 +928,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -954,7 +954,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Tessa",
+   "good_buy": "Tessa",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -980,7 +980,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Graeme",
+   "good_buy": "Graeme",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -1006,7 +1006,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -1032,7 +1032,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -1058,7 +1058,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -1084,7 +1084,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": "Tessa",
+   "good_buy": "Tessa",
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"
@@ -1110,7 +1110,7 @@
    "peak_6m_date": null,
    "drawdown_pct": null,
    "last_close_date": null,
-   "watcher": null,
+   "good_buy": null,
    "stale": true,
    "notes": [
     "Awaiting first refresh - run scripts/fetch_prices.py"

@@ -81,9 +81,9 @@ python3 scripts/fetch_prices.py --watch 900   # refresh every 15 minutes
 ```
 
 See [`docs/README.md`](../docs/README.md) for the dashboard, deployment, and how
-to edit the watchlists.
+to edit the good-buy ratings.
 
-Holdings, watchlists and corporate-action context are declared in the
+Holdings, good-buy ratings and corporate-action context are declared in the
 configuration block at the top of the script. History is fetched for all
 tickers in one batched request (with per-ticker retry for anything the batch
 misses) to stay well clear of Yahoo's rate limits at a 20-minute cadence.

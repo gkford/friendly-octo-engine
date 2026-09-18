@@ -52,10 +52,11 @@ HOLDINGS: list[tuple[str, float]] = [
     ("HONA", 2),
 ]
 
-# Who is watching what. Add names or tickers freely -- a ticker appearing in more
-# than one list is rendered as "Both" (see resolve_watchers). Adding a third
-# person would need one more colour slot in docs/index.html; see its legend note.
-WATCHERS: dict[str, list[str]] = {
+# Who rates what as a good buy. This is a view on the stock, not a record of
+# who owns or watches it. Add names or tickers freely -- a ticker appearing in
+# more than one list renders as "Both" (see resolve_good_buys). A third person
+# would need one more colour slot in docs/index.html; see its legend note.
+GOOD_BUYS: dict[str, list[str]] = {
     "Tessa": ["AMZN", "GLW", "MRVL", "INTC", "KBR", "HON", "RKLB"],
     "Graeme": ["RKLB", "NBIS"],
 }
@@ -354,10 +355,14 @@ def split_artifact(close: "pd.Series", split_date: date, ratio: float) -> bool:
     return False
 
 
-def resolve_watchers() -> dict[str, str]:
-    """Map ticker -> "Tessa" | "Graeme" | "Both" from the WATCHERS config."""
+def resolve_good_buys() -> dict[str, str]:
+    """Map ticker -> "Tessa" | "Graeme" | "Both" from the GOOD_BUYS config.
+
+    A ticker both people rate resolves to "Both" on its own; there is no
+    separate "both" list to keep in sync.
+    """
     counts: dict[str, list[str]] = {}
-    for person, tickers in WATCHERS.items():
+    for person, tickers in GOOD_BUYS.items():
         for t in tickers:
             counts.setdefault(t.upper(), []).append(person)
     return {t: (people[0] if len(people) == 1 else "Both")
@@ -536,7 +541,7 @@ def refresh(path: str, delay: float) -> dict:
     started = datetime.now(timezone.utc)
     previous = load_previous(path)
     prev_rows = {r["ticker"]: r for r in previous.get("positions", [])}
-    watchers = resolve_watchers()
+    good_buys = resolve_good_buys()
 
     # Resolve each holding to a working yfinance symbol, reusing whatever the
     # last run proved worked so dotted tickers are not re-probed every 15 min.
@@ -593,7 +598,7 @@ def refresh(path: str, delay: float) -> dict:
                 "shares": shares, "notes": []}), f"calculation error: {exc}"))
             continue
 
-        row["watcher"] = watchers.get(ticker)
+        row["good_buy"] = good_buys.get(ticker)
         positions.append(row)
         time.sleep(delay)
 
@@ -603,7 +608,7 @@ def refresh(path: str, delay: float) -> dict:
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "duration_seconds": round((datetime.now(timezone.utc) - started).total_seconds(), 1),
         "fx": fx,
-        "watchers": WATCHERS,
+        "good_buys": GOOD_BUYS,
         "failures": failures,
         "positions": positions,
     }
